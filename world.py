@@ -480,12 +480,12 @@ def main():
         hud_x = px + 10
         stats_y = 10
         
-        def txt(s, f=None, color=(180, 180, 200)):
+        def txt(s, f=None, color=(230, 230, 240)):
             nonlocal stats_y
             screen.blit((f or font).render(str(s), True, color), (px + 10, stats_y))
             stats_y += (f or font).get_height() + 2
             
-        def trow(vals, f=None, color=(180, 180, 200)):
+        def trow(vals, f=None, color=(230, 230, 240)):
             nonlocal stats_y
             cx = px + 10
             col_widths = [100, 60, 60, 60, 60]
@@ -501,14 +501,14 @@ def main():
             stats_y += 8
 
         # Title
-        title_surf = font_lg.render("WIGHT-WORLD", True, (220, 220, 255))
+        title_surf = font_lg.render("WIGHT-WORLD", True, (255, 255, 255))
         screen.blit(title_surf, (px + 10, stats_y))
-        screen.blit(font_sm.render("DISCRETE ANE", True, (100, 110, 140)), (px + 15 + title_surf.get_width(), stats_y + 4))
+        screen.blit(font_sm.render("DISCRETE ANE", True, (170, 180, 210)), (px + 15 + title_surf.get_width(), stats_y + 4))
         stats_y += font_lg.get_height() + 2
         sep()
         
         # Stats
-        txt(f"tick {tick_count:,}   [ANE]  SPACE=cycle", font_sm, (120, 120, 150))
+        txt(f"tick {tick_count:,}   [ANE]  SPACE=cycle", font_sm, (230, 230, 245))
         sep()
         
         total_food = int(t[0].sum() * 100)
@@ -531,8 +531,8 @@ def main():
             
             biomass = int(orgs[y_idx, x_idx].sum() * 100)
             
-            txt(f"POPULATION  {pop:,}      BIOMASS  {biomass:,}", font_sm, (180, 220, 180))
-            txt(f"WORLD FOOD  {total_food:<7,}", font_sm, (140, 190, 140))
+            txt(f"POPULATION  {pop:,}      BIOMASS  {biomass:,}", font_sm, (200, 255, 200))
+            txt(f"WORLD FOOD  {total_food:<7,}", font_sm, (180, 240, 180))
             stats_y += 4
             
             # Event Tracking
@@ -560,18 +560,18 @@ def main():
                 ui_prev['d_avg'] = avg_drain
                 ui_events = ui_events[-6:] # Keep last 6
             
-            trow(["", "MIN", "AVG", "MAX", "STD"], font_sm, (100, 110, 140))
-            trow(["Energy", min_energy, avg_energy, max_energy, std_energy], font_sm, (180, 180, 200))
-            trow(["Age", min_age, avg_age, max_age, std_age], font_sm, (180, 180, 200))
-            trow(["Metabolism", min_drain, avg_drain, max_drain, std_drain], font_sm, (180, 180, 200))
+            trow(["", "MIN", "AVG", "MAX", "STD"], font_sm, (170, 180, 210))
+            trow(["Energy", min_energy, avg_energy, max_energy, std_energy], font_sm, (230, 230, 245))
+            trow(["Age", min_age, avg_age, max_age, std_age], font_sm, (230, 230, 245))
+            trow(["Metabolism", min_drain, avg_drain, max_drain, std_drain], font_sm, (230, 230, 245))
             sep()
         else:
-            txt(f"POPULATION  0         BIOMASS  0", font_sm, (180, 220, 180))
-            txt(f"WORLD FOOD  {total_food:<7,}", font_sm, (140, 190, 140))
+            txt(f"POPULATION  0         BIOMASS  0", font_sm, (200, 255, 200))
+            txt(f"WORLD FOOD  {total_food:<7,}", font_sm, (180, 240, 180))
             sep()
         
         # LINEAGES Over Time (Rainbow Stacked Area Chart)
-        txt("LINEAGES over time", font, (200, 180, 140))
+        txt("LINEAGES over time", font, (255, 210, 120))
         rx, ry, rw, rh = px + 8, stats_y, 350, 100
         
         pygame.draw.rect(screen, (20, 20, 25), (rx, ry, rw, rh))
@@ -627,7 +627,7 @@ def main():
                 u, s, vh = np.linalg.svd(W_cen, full_matrices=False)
                 proj = np.dot(W_cen, vh[:2].T)
                 
-                screen.blit(font.render("STRATEGY SPACE  (W_wight PCA)", True, (160, 180, 220)), (hud_x, stats_y)); stats_y += 15
+                screen.blit(font.render("STRATEGY SPACE  (W_wight PCA)", True, (220, 230, 255)), (hud_x, stats_y)); stats_y += 15
                 pca_h = 130
                 pygame.draw.rect(screen, (20, 20, 25), (hud_x, stats_y, rw, pca_h))
                 pygame.draw.rect(screen, (40, 40, 50), (hud_x, stats_y, rw, pca_h), 1)
@@ -652,7 +652,7 @@ def main():
 
         # Trait Map
         if pop > 0:
-            screen.blit(font.render("TRAITS (median | p10-p90 band)", True, (160, 180, 220)), (hud_x, stats_y)); stats_y += 15
+            screen.blit(font.render("TRAITS (median | p10-p90 band)", True, (220, 230, 255)), (hud_x, stats_y)); stats_y += 15
             W_pop = weights[:, y_idx, x_idx].T # (pop, 15)
             if pop > 1:
                 p10 = np.percentile(W_pop, 10, axis=0)
@@ -681,7 +681,7 @@ def main():
             
             for i, name in enumerate(trait_names):
                 # Text
-                screen.blit(font_sm.render(f"{name:<11}", True, (140, 140, 160)), (hud_x, stats_y))
+                screen.blit(font_sm.render(f"{name:<11}", True, (200, 200, 220)), (hud_x, stats_y))
                 
                 # Bars
                 bar_x = hud_x + 90
@@ -722,11 +722,11 @@ def main():
             pygame.draw.rect(s, (40, 40, 60, 255), s.get_rect(), 1)
             screen.blit(s, (10, 10))
             
-            screen.blit(font.render("LIVE EVENTS", True, (200, 180, 140)), (20, 18))
+            screen.blit(font.render("LIVE EVENTS", True, (255, 210, 120)), (20, 18))
             e_y = 35 + font.get_height() // 2
             line_spacing = font_sm.get_height() + 2
             for ev in ui_events:
-                screen.blit(font_sm.render(ev, True, (160, 180, 200)), (20, e_y))
+                screen.blit(font_sm.render(ev, True, (220, 230, 250)), (20, e_y))
                 e_y += line_spacing
 
         pygame.display.flip()
