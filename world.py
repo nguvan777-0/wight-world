@@ -503,7 +503,7 @@ def main():
         # Title
         title_surf = font_lg.render("WIGHT-WORLD", True, (255, 255, 255))
         screen.blit(title_surf, (px + 10, stats_y))
-        screen.blit(font_sm.render("DISCRETE ANE", True, (170, 180, 210)), (px + 15 + title_surf.get_width(), stats_y + 4))
+        
         stats_y += font_lg.get_height() + 2
         sep()
         
@@ -570,7 +570,7 @@ def main():
         
         # LINEAGES Over Time (Rainbow Stacked Area Chart)
         txt("LINEAGES over time", font, (255, 210, 120))
-        rx, ry, rw, rh = px + 8, stats_y, 350, 85
+        rx, ry, rw, rh = px + 8, stats_y, 350, 95
         
         pygame.draw.rect(screen, (20, 20, 25), (rx, ry, rw, rh))
         if len(lineage_history) > 1:
@@ -626,7 +626,7 @@ def main():
                 proj = np.dot(W_cen, vh[:2].T)
                 
                 screen.blit(font.render("STRATEGY SPACE  (W_wight PCA)", True, (220, 230, 255)), (hud_x, stats_y)); stats_y += 15
-                pca_h = 105
+                pca_h = 115
                 pygame.draw.rect(screen, (20, 20, 25), (hud_x, stats_y, rw, pca_h))
                 pygame.draw.rect(screen, (40, 40, 50), (hud_x, stats_y, rw, pca_h), 1)
                 
@@ -677,21 +677,27 @@ def main():
                 s = (t_val - 0.5) * 2
                 return tuple(int(mid[j] + (hi[j] - mid[j]) * s) for j in range(3))
             
+            # Dynamically compute row height based on remaining space
+            available_h = H_PX - stats_y - 5
+            row_interval = max(11.0, available_h / 15.0)
+            row_h = int(row_interval) - 1 # Leaves 1px pad between rows
+            
             for i, name in enumerate(trait_names):
+                y_baseline = stats_y + int(i * row_interval)
+                
                 # Text
-                screen.blit(font_sm.render(f"{name:<11}", True, (200, 200, 220)), (hud_x, stats_y))
+                screen.blit(font_sm.render(f"{name:<11}", True, (200, 200, 220)), (hud_x, y_baseline))
                 
                 # Bars
                 bar_x = hud_x + 90
                 bar_w = 260
-                row_h = 11
                 
                 # Background track for visualization
-                pygame.draw.rect(screen, (20, 20, 32), (bar_x, stats_y + 1, bar_w, row_h - 2))
+                pygame.draw.rect(screen, (20, 20, 32), (bar_x, y_baseline + 1, bar_w, row_h - 2))
                 
                 # Zero line
                 z_x = bar_x + int((0 - v_min) / (v_max - v_min) * bar_w)
-                pygame.draw.line(screen, (40, 40, 50), (z_x, stats_y), (z_x, stats_y + row_h))
+                pygame.draw.line(screen, (40, 40, 50), (z_x, y_baseline), (z_x, y_baseline + row_h))
                 
                 def sx(v):
                     return max(0, min(bar_w, int((v - v_min) / (v_max - v_min) * bar_w)))
@@ -704,12 +710,12 @@ def main():
                 
                 # Background p10-p90 band (dim rainbow tinted)
                 if x90 > x10:
-                    pygame.draw.rect(screen, dim, (bar_x + x10, stats_y + 1, x90 - x10, row_h - 2))
+                    pygame.draw.rect(screen, dim, (bar_x + x10, y_baseline + 1, x90 - x10, row_h - 2))
                 
                 # Median marker
-                pygame.draw.rect(screen, color, (bar_x + xmed - 1, stats_y, 3, row_h))
-                
-                stats_y += row_h + 1
+                pygame.draw.rect(screen, color, (bar_x + xmed - 1, y_baseline, 3, row_h))
+            
+            stats_y = H_PX
         
         # Event History Transparency Window
         if ui_events:
