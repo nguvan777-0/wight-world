@@ -1,0 +1,12 @@
+[project]
+name = "wight-world"
+version = "0.1.0"
+description = "A Neural Cellular Automaton that executes natural selection purely through spatial 2D matrix convolutions."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "coremltools>=9.0; sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "numpy>=2.4.3",
+    "plotly>=6.6.0",
+    "pygame>=2.6.1",
+]
