@@ -503,11 +503,10 @@ def main():
         title_surf = font_lg.render("WIGHT-WORLD", True, (255, 255, 255))
         screen.blit(title_surf, (px + 10, stats_y))
 
-        stats_y += font_lg.get_height() + 2
-        sep()
+        tick_surf = font_sm.render(f"tick {tick_count:,}   [ANE]   SPACE=cycle", True, (230, 230, 245))
+        screen.blit(tick_surf, (px + 10 + title_surf.get_width() + 15, stats_y + 4))
 
-        # Stats
-        txt(f"tick {tick_count:,}   [ANE]  SPACE=cycle", font_sm, (230, 230, 245))
+        stats_y += font_lg.get_height() + 2
         sep()
 
         total_food = int(t[0].sum() * 100)
@@ -530,7 +529,7 @@ def main():
 
             biomass = int(orgs[y_idx, x_idx].sum() * 100)
 
-            txt(f"POPULATION {pop:,}     BIOMASS {biomass:,}     WORLD FOOD {total_food:,}", font_sm, (200, 255, 200))
+            txt(f"POPULATION {pop:,}   BIOMASS {biomass:,}   FOOD {total_food:,}", font_sm, (200, 255, 200))
             stats_y += 4
 
             # Event Tracking
@@ -564,7 +563,7 @@ def main():
             trow(["Metabolism", min_drain, avg_drain, max_drain, std_drain], font_sm, (230, 230, 245))
             sep()
         else:
-            txt(f"POPULATION 0     BIOMASS 0     WORLD FOOD {total_food:,}", font_sm, (200, 255, 200))
+            txt(f"POPULATION 0   BIOMASS 0   FOOD {total_food:,}", font_sm, (200, 255, 200))
             sep()
 
         # LINEAGES Over Time (Rainbow Stacked Area Chart)
@@ -603,16 +602,18 @@ def main():
             lx_iter = hud_x
             for aid, cnt in sorted(current_lineages.items(), key=lambda kv: -kv[1])[:10]:
                 color = _LINEAGE_COLORS[aid]
-                pygame.draw.circle(screen, color, (lx_iter + 4, stats_y + 8), 5)
+                pygame.draw.circle(screen, color, (lx_iter + 4, stats_y + 6), 5)
                 text_surf = font.render(f"{cnt}", True, color)
                 screen.blit(text_surf, (lx_iter + 14, stats_y))
                 lx_iter += text_surf.get_width() + 24
 
                 if lx_iter > hud_x + rw - 35:
                     lx_iter = hud_x
-                    stats_y += 20
+                    stats_y += 18
 
-        stats_y += 10
+            stats_y += 18
+        else:
+            stats_y += 18
 
         # Strategy Space (Live PCA over Neural Weights)
         if pop > 3:
