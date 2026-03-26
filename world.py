@@ -596,9 +596,10 @@ def main():
             lx_iter = hud_x
             for aid, cnt in sorted(current_lineages.items(), key=lambda kv: -kv[1])[:10]:
                 color = _LINEAGE_COLORS[aid]
-                pygame.draw.circle(screen, color, (lx_iter + 4, stats_y + 5), 5)
-                screen.blit(font.render(f"{cnt}", True, color), (lx_iter + 12, stats_y))
-                lx_iter += 45
+                pygame.draw.circle(screen, color, (lx_iter + 4, stats_y + 8), 5)
+                text_surf = font.render(f"{cnt}", True, color)
+                screen.blit(text_surf, (lx_iter + 14, stats_y))
+                lx_iter += text_surf.get_width() + 24
                 
                 if lx_iter > hud_x + rw - 35:
                     lx_iter = hud_x
