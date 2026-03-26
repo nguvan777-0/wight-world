@@ -530,8 +530,7 @@ def main():
 
             biomass = int(orgs[y_idx, x_idx].sum() * 100)
 
-            txt(f"POPULATION  {pop:,}      BIOMASS  {biomass:,}", font_sm, (200, 255, 200))
-            txt(f"WORLD FOOD  {total_food:<7,}", font_sm, (180, 240, 180))
+            txt(f"POPULATION {pop:,}     BIOMASS {biomass:,}     WORLD FOOD {total_food:,}", font_sm, (200, 255, 200))
             stats_y += 4
 
             # Event Tracking
@@ -565,13 +564,12 @@ def main():
             trow(["Metabolism", min_drain, avg_drain, max_drain, std_drain], font_sm, (230, 230, 245))
             sep()
         else:
-            txt(f"POPULATION  0         BIOMASS  0", font_sm, (200, 255, 200))
-            txt(f"WORLD FOOD  {total_food:<7,}", font_sm, (180, 240, 180))
+            txt(f"POPULATION 0     BIOMASS 0     WORLD FOOD {total_food:,}", font_sm, (200, 255, 200))
             sep()
 
         # LINEAGES Over Time (Rainbow Stacked Area Chart)
         txt("LINEAGES over time", font, (255, 210, 120))
-        rx, ry, rw, rh = px + 8, stats_y, 350, 65
+        rx, ry, rw, rh = px + 8, stats_y, 350, 85
 
         pygame.draw.rect(screen, (20, 20, 25), (rx, ry, rw, rh))
         if len(lineage_history) > 1:
@@ -627,7 +625,7 @@ def main():
                 proj = np.dot(W_cen, vh[:2].T)
 
                 screen.blit(font.render("STRATEGY SPACE  (W_wight PCA)", True, (220, 230, 255)), (hud_x, stats_y)); stats_y += 15
-                pca_h = 85
+                pca_h = 105
                 pygame.draw.rect(screen, (20, 20, 25), (hud_x, stats_y, rw, pca_h))
                 pygame.draw.rect(screen, (40, 40, 50), (hud_x, stats_y, rw, pca_h), 1)
 
