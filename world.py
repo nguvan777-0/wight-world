@@ -354,22 +354,22 @@ def main():
                     notes = []
                     if _prev['pop'] is not None:
                         if pop < _prev['pop'] * 0.5:
-                            notes.append(f"population crash  {_prev['pop']} → {pop}")
+                            notes.append(f"population crash  {_prev['pop']} -> {pop}")
                         elif pop > _prev['pop'] * 2.0:
-                            notes.append(f"population boom  {_prev['pop']} → {pop}")
+                            notes.append(f"population boom  {_prev['pop']} -> {pop}")
 
                     if max_age >= 1000 and 'age_1k' not in _flags:
-                        notes.append("longevity unlocked — max age > 1,000")
+                        notes.append("longevity unlocked - max age > 1,000")
                         _flags.add('age_1k')
                     elif max_age >= 5000 and 'age_5k' not in _flags:
-                        notes.append("immortality — max age > 5,000")
+                        notes.append("immortality - max age > 5,000")
                         _flags.add('age_5k')
 
                     if _prev['d_avg'] is not None:
                         if avg_drain > _prev['d_avg'] * 1.5 and avg_drain > 50:
-                            notes.append(f"metabolism surging  {_prev['d_avg']} → {avg_drain}")
+                            notes.append(f"metabolism surging  {_prev['d_avg']} -> {avg_drain}")
                         elif avg_drain < _prev['d_avg'] * 0.6 and _prev['d_avg'] > 50:
-                            notes.append(f"efficiency breakthrough  {_prev['d_avg']} → {avg_drain}")
+                            notes.append(f"efficiency breakthrough  {_prev['d_avg']} -> {avg_drain}")
 
                     for note in notes:
                         print(f"          ↳ {note}")
@@ -526,22 +526,22 @@ def main():
             if tick_count % 120 == 0:
                 if ui_prev['pop'] is not None:
                     if pop < ui_prev['pop'] * 0.5:
-                        ui_events.append(f"[{tick_count}] population crash  {ui_prev['pop']} → {pop}")
+                        ui_events.append(f"[{tick_count}] population crash  {ui_prev['pop']} -> {pop}")
                     elif pop > ui_prev['pop'] * 2.0:
-                        ui_events.append(f"[{tick_count}] population boom  {ui_prev['pop']} → {pop}")
+                        ui_events.append(f"[{tick_count}] population boom  {ui_prev['pop']} -> {pop}")
 
                 if max_age >= 1000 and 'age_1k' not in ui_flags:
-                    ui_events.append(f"[{tick_count}] longevity unlocked — max age > 1,000")
+                    ui_events.append(f"[{tick_count}] longevity unlocked - max age > 1,000")
                     ui_flags.add('age_1k')
                 elif max_age >= 5000 and 'age_5k' not in ui_flags:
-                    ui_events.append(f"[{tick_count}] immortality — max age > 5,000")
+                    ui_events.append(f"[{tick_count}] immortality - max age > 5,000")
                     ui_flags.add('age_5k')
 
                 if ui_prev['d_avg'] is not None:
                     if avg_drain > ui_prev['d_avg'] * 1.5 and avg_drain > 50:
-                        ui_events.append(f"[{tick_count}] metabolism surging  {ui_prev['d_avg']} → {avg_drain}")
+                        ui_events.append(f"[{tick_count}] metabolism surging  {ui_prev['d_avg']} -> {avg_drain}")
                     elif avg_drain < ui_prev['d_avg'] * 0.6 and ui_prev['d_avg'] > 50:
-                        ui_events.append(f"[{tick_count}] efficiency breakthrough  {ui_prev['d_avg']} → {avg_drain}")
+                        ui_events.append(f"[{tick_count}] efficiency breakthrough  {ui_prev['d_avg']} -> {avg_drain}")
 
                 ui_prev['pop'] = pop
                 ui_prev['d_avg'] = avg_drain
