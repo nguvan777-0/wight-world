@@ -17,7 +17,7 @@ except ImportError:
 W_GRID, H_GRID = 64, 64
 RENDER_SCALE = 12
 W_PX, H_PX = W_GRID * RENDER_SCALE, H_GRID * RENDER_SCALE
-HUD_WIDTH = 320
+HUD_WIDTH = 380
 
 CH_FOOD = 1
 CH_ENERGY = 1
@@ -288,13 +288,15 @@ def main():
         
         # Load fonts
         try:
-            font = pygame.font.SysFont("monospace", 12)
-            font_sm = pygame.font.SysFont("monospace", 10)
-            font_lg = pygame.font.SysFont("monospace", 14)
+            # specifically request crisp programming fonts before falling back
+            font_family = "menlo,monaco,consolas,unifont,monospace"
+            font = pygame.font.SysFont(font_family, 14, bold=True)
+            font_sm = pygame.font.SysFont(font_family, 12, bold=True)
+            font_lg = pygame.font.SysFont(font_family, 18, bold=True)
         except:
-            font = pygame.font.SysFont(None, 12)
-            font_sm = pygame.font.SysFont(None, 10)
-            font_lg = pygame.font.SysFont(None, 14)
+            font = pygame.font.SysFont(None, 14, bold=True)
+            font_sm = pygame.font.SysFont(None, 12, bold=True)
+            font_lg = pygame.font.SysFont(None, 18, bold=True)
             
         clock = pygame.time.Clock()
         
@@ -702,18 +704,19 @@ def main():
         
         # Event History Transparency Window
         if ui_events:
-            ev_w = 320
-            ev_h = 24 + len(ui_events) * 14
+            ev_w = 380
+            ev_h = 40 + len(ui_events) * (font_sm.get_height() + 2)
             s = pygame.Surface((ev_w, ev_h), pygame.SRCALPHA)
             s.fill((16, 16, 24, 210)) # Semi-transparent dark
             pygame.draw.rect(s, (40, 40, 60, 255), s.get_rect(), 1)
             screen.blit(s, (10, 10))
             
             screen.blit(font.render("LIVE EVENTS", True, (200, 180, 140)), (20, 18))
-            e_y = 35
+            e_y = 35 + font.get_height() // 2
+            line_spacing = font_sm.get_height() + 2
             for ev in ui_events:
                 screen.blit(font_sm.render(ev, True, (160, 180, 200)), (20, e_y))
-                e_y += 14
+                e_y += line_spacing
 
         pygame.display.flip()
         
