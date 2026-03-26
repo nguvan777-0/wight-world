@@ -283,7 +283,7 @@ def main():
 
     if not is_headless:
         pygame.init()
-        screen = pygame.display.set_mode((W_PX + HUD_WIDTH, H_PX), pygame.SCALED | pygame.RESIZABLE)
+        screen = pygame.display.set_mode((W_PX + HUD_WIDTH, H_PX), pygame.SCALED)
         pygame.display.set_caption("wight-world")
         
         # Load fonts
