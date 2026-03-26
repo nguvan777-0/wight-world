@@ -15,7 +15,7 @@ except ImportError:
 
 # --- Configuration ---
 W_GRID, H_GRID = 64, 64
-RENDER_SCALE = 12
+RENDER_SCALE = 10
 W_PX, H_PX = W_GRID * RENDER_SCALE, H_GRID * RENDER_SCALE
 HUD_WIDTH = 380
 
