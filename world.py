@@ -289,14 +289,14 @@ def main():
         # Load fonts
         try:
             # specifically request crisp programming fonts before falling back
-            font_family = "avenir next,avenir,helvetica neue,helvetica,arial,sans-serif"
+            font_family = "sf mono,menlo,monaco,consolas,unifont,monospace"
             font = pygame.font.SysFont(font_family, 14, bold=False)
             font_sm = pygame.font.SysFont(font_family, 12, bold=False)
-            font_lg = pygame.font.SysFont(font_family, 18, bold=True)
+            font_lg = pygame.font.SysFont(font_family, 18, bold=False)
         except:
             font = pygame.font.SysFont(None, 14, bold=False)
             font_sm = pygame.font.SysFont(None, 12, bold=False)
-            font_lg = pygame.font.SysFont(None, 18, bold=True)
+            font_lg = pygame.font.SysFont(None, 18, bold=False)
             
         clock = pygame.time.Clock()
         
@@ -484,6 +484,16 @@ def main():
             nonlocal stats_y
             screen.blit((f or font).render(str(s), True, color), (px + 10, stats_y))
             stats_y += (f or font).get_height() + 2
+            
+        def trow(vals, f=None, color=(180, 180, 200)):
+            nonlocal stats_y
+            cx = px + 10
+            col_widths = [100, 60, 60, 60, 60]
+            f = f or font_sm
+            for i, v in enumerate(vals):
+                screen.blit(f.render(str(v), True, color), (cx, stats_y))
+                cx += col_widths[i]
+            stats_y += f.get_height() + 2
 
         def sep():
             nonlocal stats_y
@@ -521,7 +531,7 @@ def main():
             
             biomass = int(orgs[y_idx, x_idx].sum() * 100)
             
-            txt(f"POPULATION  {pop:<7,}   BIOMASS  {biomass:,}", font_sm, (180, 220, 180))
+            txt(f"POPULATION  {pop:,}      BIOMASS  {biomass:,}", font_sm, (180, 220, 180))
             txt(f"WORLD FOOD  {total_food:<7,}", font_sm, (140, 190, 140))
             stats_y += 4
             
@@ -550,10 +560,10 @@ def main():
                 ui_prev['d_avg'] = avg_drain
                 ui_events = ui_events[-6:] # Keep last 6
             
-            txt("            MIN     AVG     MAX     STD", font_sm, (100, 110, 140))
-            txt(f"Energy      {min_energy:<7} {avg_energy:<7} {max_energy:<7} {std_energy}", font_sm, (180, 180, 200))
-            txt(f"Age         {min_age:<7} {avg_age:<7} {max_age:<7} {std_age}", font_sm, (180, 180, 200))
-            txt(f"Metabolism  {min_drain:<7} {avg_drain:<7} {max_drain:<7} {std_drain}", font_sm, (180, 180, 200))
+            trow(["", "MIN", "AVG", "MAX", "STD"], font_sm, (100, 110, 140))
+            trow(["Energy", min_energy, avg_energy, max_energy, std_energy], font_sm, (180, 180, 200))
+            trow(["Age", min_age, avg_age, max_age, std_age], font_sm, (180, 180, 200))
+            trow(["Metabolism", min_drain, avg_drain, max_drain, std_drain], font_sm, (180, 180, 200))
             sep()
         else:
             txt(f"POPULATION  0         BIOMASS  0", font_sm, (180, 220, 180))
@@ -562,7 +572,7 @@ def main():
         
         # LINEAGES Over Time (Rainbow Stacked Area Chart)
         txt("LINEAGES over time", font, (200, 180, 140))
-        rx, ry, rw, rh = px + 8, stats_y, 280, 100
+        rx, ry, rw, rh = px + 8, stats_y, 350, 100
         
         pygame.draw.rect(screen, (20, 20, 25), (rx, ry, rw, rh))
         if len(lineage_history) > 1:
@@ -675,7 +685,7 @@ def main():
                 
                 # Bars
                 bar_x = hud_x + 90
-                bar_w = 180
+                bar_w = 260
                 row_h = 13
                 
                 # Background track for visualization
