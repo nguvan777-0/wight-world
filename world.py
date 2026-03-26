@@ -283,19 +283,19 @@ def main():
 
     if not is_headless:
         pygame.init()
-        screen = pygame.display.set_mode((W_PX + HUD_WIDTH, H_PX))
+        screen = pygame.display.set_mode((W_PX + HUD_WIDTH, H_PX), pygame.SCALED | pygame.RESIZABLE)
         pygame.display.set_caption("wight-world")
         
         # Load fonts
         try:
             # specifically request crisp programming fonts before falling back
-            font_family = "menlo,monaco,consolas,unifont,monospace"
-            font = pygame.font.SysFont(font_family, 14, bold=True)
-            font_sm = pygame.font.SysFont(font_family, 12, bold=True)
+            font_family = "avenir next,avenir,helvetica neue,helvetica,arial,sans-serif"
+            font = pygame.font.SysFont(font_family, 14, bold=False)
+            font_sm = pygame.font.SysFont(font_family, 12, bold=False)
             font_lg = pygame.font.SysFont(font_family, 18, bold=True)
         except:
-            font = pygame.font.SysFont(None, 14, bold=True)
-            font_sm = pygame.font.SysFont(None, 12, bold=True)
+            font = pygame.font.SysFont(None, 14, bold=False)
+            font_sm = pygame.font.SysFont(None, 12, bold=False)
             font_lg = pygame.font.SysFont(None, 18, bold=True)
             
         clock = pygame.time.Clock()
