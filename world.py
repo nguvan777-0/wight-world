@@ -502,12 +502,21 @@ def main():
         total_food = int(t[0].sum() * 100)
         
         if pop > 0:
-            max_energy = int(orgs[y_idx, x_idx].max() * 100)
+            min_energy = int(orgs[y_idx, x_idx].min() * 100)
             avg_energy = int(orgs[y_idx, x_idx].mean() * 100)
-            max_age = int(ages[y_idx, x_idx].max())
+            max_energy = int(orgs[y_idx, x_idx].max() * 100)
+            std_energy = int(orgs[y_idx, x_idx].std() * 100)
+            
+            min_age = int(ages[y_idx, x_idx].min())
             avg_age = int(ages[y_idx, x_idx].mean())
-            max_drain = int(drains[y_idx, x_idx].max() * 100)
+            max_age = int(ages[y_idx, x_idx].max())
+            std_age = int(ages[y_idx, x_idx].std())
+            
+            min_drain = int(drains[y_idx, x_idx].min() * 100)
             avg_drain = int(drains[y_idx, x_idx].mean() * 100)
+            max_drain = int(drains[y_idx, x_idx].max() * 100)
+            std_drain = int(drains[y_idx, x_idx].std() * 100)
+            
             biomass = int(orgs[y_idx, x_idx].sum() * 100)
             
             txt(f"POPULATION  {pop:<7,}   BIOMASS  {biomass:,}", font_sm, (180, 220, 180))
@@ -539,10 +548,10 @@ def main():
                 ui_prev['d_avg'] = avg_drain
                 ui_events = ui_events[-6:] # Keep last 6
             
-            txt("            AVG      MAX", font_sm, (100, 110, 140))
-            txt(f"Energy      {avg_energy:<8} {max_energy}", font_sm, (180, 180, 200))
-            txt(f"Age         {avg_age:<8} {max_age}", font_sm, (180, 180, 200))
-            txt(f"Metabolism  {avg_drain:<8} {max_drain}", font_sm, (180, 180, 200))
+            txt("            MIN     AVG     MAX     STD", font_sm, (100, 110, 140))
+            txt(f"Energy      {min_energy:<7} {avg_energy:<7} {max_energy:<7} {std_energy}", font_sm, (180, 180, 200))
+            txt(f"Age         {min_age:<7} {avg_age:<7} {max_age:<7} {std_age}", font_sm, (180, 180, 200))
+            txt(f"Metabolism  {min_drain:<7} {avg_drain:<7} {max_drain:<7} {std_drain}", font_sm, (180, 180, 200))
             sep()
         else:
             txt(f"POPULATION  0         BIOMASS  0", font_sm, (180, 220, 180))
