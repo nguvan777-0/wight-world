@@ -24,13 +24,13 @@ Because there are no arrays of objects to iterate through, time complexity is a 
 Requires Python 3.11+. The first run will evaluate the matrix graph and compile an ANE-optimized `.mlpackage` to the local `build/` directory. Subsequent boots load instantly from this hardware cache.
 
 ```bash
-uv run --with numpy --with coremltools --with pygame python world.py
+uv run python world.py
 ```
 
 Or, bypass the UI and execute headlessly for a specific number of ticks to crunch the tensor math at hardware speed:
 
 ```bash
-uv run --with numpy --with coremltools python world.py 1200
+uv run python world.py --headless --ticks 1200
 ```
 
 ```text

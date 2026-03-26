@@ -1,7 +1,10 @@
 import os
 import sys
 import time
+import argparse
 import numpy as np
+
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame
 
 try:
@@ -270,17 +273,15 @@ def drop_organism(world, gx, gy, lineage_id=None):
     world[0, 4:, gy, gx] = weights
 
 def main():
-    headless_ticks = None
-    if len(sys.argv) > 1:
-        try:
-            headless_ticks = int(sys.argv[1])
-        except ValueError:
-            pass
+    parser = argparse.ArgumentParser(description="wight-world neuroevolution engine")
+    parser.add_argument("--headless", action="store_true", help="Run in terminal without UI")
+    parser.add_argument("--ticks", type=int, default=None, help="Number of ticks to run (default: infinite)")
+    args = parser.parse_args()
 
-    is_headless = headless_ticks is not None
+    is_headless = args.headless
+    max_ticks = args.ticks
 
     if not is_headless:
-        os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
         pygame.init()
         screen = pygame.display.set_mode((W_PX + HUD_WIDTH, H_PX))
         pygame.display.set_caption("wight-world")
@@ -315,7 +316,8 @@ def main():
         drop_organism(world, np.random.randint(W_GRID), np.random.randint(H_GRID), lineage_id=i)
 
     if is_headless:
-        print(f"\nRunning simulation headless for {headless_ticks} ticks...")
+        duration_str = f"{max_ticks:,} ticks" if max_ticks else "forever"
+        print(f"\nRunning simulation headless for {duration_str}...")
         print("─" * 72)
         print(f"{'tick':>8} {'pop':>6} {'e_avg':>6} {'e_max':>6} {'a_avg':>6} {'a_max':>6} {'d_avg':>6} {'d_max':>6}  elapsed")
         print("─" * 72)
@@ -324,7 +326,8 @@ def main():
         _prev = {'pop': None, 'd_avg': None}
         _flags = set()
 
-        for i in range(headless_ticks):
+        i = 0
+        while max_ticks is None or i < max_ticks:
             mutation = (np.random.randn(1, CH_WEIGHTS, H_GRID, W_GRID) * 0.1).astype(np.float32)
             out = model.predict({"world": world, "mutation": mutation})
             world = list(out.values())[0]
@@ -332,7 +335,7 @@ def main():
             world[0, 0] += np.random.rand(H_GRID, W_GRID) * 0.02
             world[0, 0] = np.clip(world[0,0], 0.0, 1.0)
 
-            if i % 500 == 0 or i == headless_ticks - 1:
+            if i % 500 == 0 or (max_ticks and i == max_ticks - 1):
                 orgs = world[0, 1]
                 ages = world[0, 2]
                 drains = world[0, 3]
@@ -377,10 +380,12 @@ def main():
                     print(f"{i:8d}      EXTINCT")
                     break
 
+            i += 1
+
         t1 = time.time()
-        fps = (i + 1) / (t1 - t0)
+        fps = i / max(1e-6, t1 - t0)
         print("─" * 72)
-        print(f"{(i + 1):,} ticks  {t1-t0:.1f}s  {fps:,.0f} t/s\n")
+        print(f"{i:,} ticks  {t1-t0:.1f}s  {fps:,.0f} t/s\n")
         return
 
     running = True
@@ -705,6 +710,9 @@ def main():
         clock.tick(60)
         tick_count += 1
         pygame.display.set_caption(f"wight-world - ANE Matrix Evolution | {clock.get_fps():.0f} FPS")
+
+        if max_ticks is not None and tick_count >= max_ticks:
+            running = False
 
     pygame.quit()
 
