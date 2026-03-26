@@ -571,7 +571,7 @@ def main():
 
         # LINEAGES Over Time (Rainbow Stacked Area Chart)
         txt("LINEAGES over time", font, (255, 210, 120))
-        rx, ry, rw, rh = px + 8, stats_y, 350, 100
+        rx, ry, rw, rh = px + 8, stats_y, 350, 65
 
         pygame.draw.rect(screen, (20, 20, 25), (rx, ry, rw, rh))
         if len(lineage_history) > 1:
@@ -598,7 +598,7 @@ def main():
             pts = [(rx + i * rw // T, ry + rh - int(sum(lineage_history[i].values()) / max(1, max(sum(f.values()) for f in lineage_history)) * rh)) for i in range(T)]
             pygame.draw.lines(screen, (120, 50, 15), False, pts, 1)
 
-        stats_y += rh + 10
+        stats_y += rh + 5
 
         # Top Living Lineages Legend
         if current_lineages:
@@ -614,7 +614,7 @@ def main():
                     lx_iter = hud_x
                     stats_y += 20
 
-        stats_y += 20
+        stats_y += 10
 
         # Strategy Space (Live PCA over Neural Weights)
         if pop > 3:
@@ -627,7 +627,7 @@ def main():
                 proj = np.dot(W_cen, vh[:2].T)
 
                 screen.blit(font.render("STRATEGY SPACE  (W_wight PCA)", True, (220, 230, 255)), (hud_x, stats_y)); stats_y += 15
-                pca_h = 130
+                pca_h = 85
                 pygame.draw.rect(screen, (20, 20, 25), (hud_x, stats_y, rw, pca_h))
                 pygame.draw.rect(screen, (40, 40, 50), (hud_x, stats_y, rw, pca_h), 1)
 
@@ -647,7 +647,7 @@ def main():
                     screen.set_at((x_c+1, y_c+1), _LINEAGE_COLORS[lid])
             except:
                 pass
-            stats_y += pca_h + 20
+            stats_y += pca_h + 10
 
         # Trait Map
         if pop > 0:
@@ -685,7 +685,7 @@ def main():
                 # Bars
                 bar_x = hud_x + 90
                 bar_w = 260
-                row_h = 13
+                row_h = 11
 
                 # Background track for visualization
                 pygame.draw.rect(screen, (20, 20, 32), (bar_x, stats_y + 1, bar_w, row_h - 2))
