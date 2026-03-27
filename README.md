@@ -30,24 +30,26 @@ uv run python world.py
 Or, bypass the UI and execute headlessly for a specific number of ticks to crunch the tensor math at hardware speed:
 
 ```bash
-uv run python world.py --headless --ticks 1200
+uv run python world.py --headless --ticks 120 --interval 30
 ```
 
 ```text
-Running simulation headless for 1200 ticks...
+Running simulation headless for 120 ticks...
 ────────────────────────────────────────────────────────────────────────
     tick    pop  e_avg  e_max  a_avg  a_max  d_avg  d_max  elapsed
 ────────────────────────────────────────────────────────────────────────
        0     24     50     50      0      1      0      1  0.0s
-     500   1588     62     79     98    501     97    508  0.4s
-          ↳ population boom  24 → 1588
-          ↳ metabolism surging  0 → 97
-    1000   1778     60     79    176   1001    175    996  0.8s
-          ↳ longevity unlocked — max age > 1,000
-          ↳ metabolism surging  97 → 175
-    1199   1719     60     79    221   1200    222   1151  1.0s
+      30    155     51     79     11     31     11     31  0.0s
+          ↳ population boom  24 -> 155
+      60    290     52     79     15     61     15     60  0.1s
+          ↳ lineage 1 has gone completely extinct
+          ↳ lineage 11 has gone completely extinct
+      90    431     53     79     21     91     21     90  0.1s
+          ↳ bottleneck recovery: lineage 3 has resurged from a critical population low
+          ↳ bottleneck recovery: lineage 4 has resurged from a critical population low
+     119    421     54     79     29    120     29    118  0.1s
 ────────────────────────────────────────────────────────────────────────
-1,200 ticks  1.0s  1,240 t/s
+120 ticks  0.1s  1,086 t/s
 ```
 
 
