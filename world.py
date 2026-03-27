@@ -604,6 +604,66 @@ def main():
     flash_r = 0
     flash_s = 0
 
+    cached_pca_surf = None
+    cached_pca_tick = -1
+
+    sim_lock = threading.Lock()
+    sim_cmd_queue = []
+
+    def sim_worker():
+        nonlocal world, tick_count, running, paused, speed_mode
+        while running:
+            with sim_lock:
+                while len(sim_cmd_queue) > 0:
+                    cmd = sim_cmd_queue.pop(0)
+                    if cmd[0] == 'reset':
+                        seed_str, seed_int = cmd[1], cmd[2]
+                        np.random.seed(seed_int)
+                        world = init_world()
+                        for i in range(12):
+                            drop_wight(world, np.random.randint(W_GRID), np.random.randint(H_GRID), lineage_id=i)
+                        tick_count = 0
+                    elif cmd[0] == 'drop':
+                        gx, gy = cmd[1], cmd[2]
+                        drop_wight(world, gx, gy)
+                        world[0, 0, max(0,gy-2):min(H_GRID,gy+2), max(0,gx-2):min(W_GRID,gx+2)] += 1.0
+
+            if paused:
+                time.sleep(0.016)
+                continue
+
+            sm = speed_mode
+            if sm == 'MAX':
+                mutation = (np.random.randn(1, CH_WEIGHTS, H_GRID, W_GRID) * 0.1).astype(np.float32)
+                out = model.predict({"world": world, "mutation": mutation})
+                new_world = list(out.values())[0]
+                new_world[0, 0] += np.random.rand(H_GRID, W_GRID) * 0.02
+                new_world[0, 0] = np.clip(new_world[0,0], 0.0, 1.0)
+                world = new_world
+                tick_count += 1
+            else:
+                t_start = time.time()
+                for _ in range(sm):
+                    with sim_lock:
+                        if paused or len(sim_cmd_queue) > 0:
+                            break
+                    mutation = (np.random.randn(1, CH_WEIGHTS, H_GRID, W_GRID) * 0.1).astype(np.float32)
+                    out = model.predict({"world": world, "mutation": mutation})
+                    new_world = list(out.values())[0]
+                    new_world[0, 0] += np.random.rand(H_GRID, W_GRID) * 0.02
+                    new_world[0, 0] = np.clip(new_world[0,0], 0.0, 1.0)
+                    world = new_world
+                    tick_count += 1
+
+                # Approximate 60 loops per second to match UI expectation
+                elapsed = time.time() - t_start
+                sleep_time = (1.0 / 60.0) - elapsed
+                if sleep_time > 0:
+                    time.sleep(sleep_time)
+
+    sim_thread = threading.Thread(target=sim_worker, daemon=True)
+    sim_thread.start()
+
     while running:
         if flash_r > 0: flash_r -= 1
         if flash_s > 0: flash_s -= 1
@@ -637,13 +697,10 @@ def main():
                     flash_r = 15
                     seed_str = "".join(random.choices(string.ascii_letters, k=6))
                     seed_int = int(hashlib.sha256(seed_str.encode('utf-8')).hexdigest(), 16) % (2**32)
-                    np.random.seed(seed_int)
                     print(f"\n[ wight-world | seed: '{seed_str}' ]")
                     print("Restarted world")
-                    world = init_world()
-                    for i in range(12):
-                        drop_wight(world, np.random.randint(W_GRID), np.random.randint(H_GRID), lineage_id=i)
-                    tick_count = 0
+                    with sim_lock:
+                        sim_cmd_queue.append(('reset', seed_str, seed_int))
                     last_event_tick = 0
                     ui_prev = {'pop': None, 'd_avg': None}
                     ui_flags.clear()
@@ -666,10 +723,8 @@ def main():
                 if LOG_WIDTH <= event.pos[0] < LOG_WIDTH + W_PX:
                     gx = np.clip((event.pos[0] - LOG_WIDTH) // RENDER_SCALE, 0, W_GRID - 1)
                     gy = np.clip(event.pos[1] // RENDER_SCALE, 0, H_GRID - 1)
-                    # Drop a wight with random genes
-                    drop_wight(world, gx, gy)
-                    # Drop some large food nearby
-                    world[0, 0, max(0,gy-2):min(H_GRID,gy+2), max(0,gx-2):min(W_GRID,gx+2)] += 1.0
+                    with sim_lock:
+                        sim_cmd_queue.append(('drop', gx, gy))
                     print(f"Spawned a wight at ({gx}, {gy})")
 
         # Hover tracking for Wight Inspector
@@ -678,26 +733,6 @@ def main():
         if LOG_WIDTH <= mx < LOG_WIDTH + W_PX and 0 <= my < H_PX:
             hover_gx = np.clip((mx - LOG_WIDTH) // RENDER_SCALE, 0, W_GRID - 1)
             hover_gy = np.clip(my // RENDER_SCALE, 0, H_GRID - 1)
-
-        if not paused:
-            if speed_mode == 'MAX':
-                t_start = time.time()
-                # Process heavily for ~33ms before yielding back to the render loop
-                while time.time() - t_start < 0.033:
-                    mutation = (np.random.randn(1, CH_WEIGHTS, H_GRID, W_GRID) * 0.1).astype(np.float32)
-                    out = model.predict({"world": world, "mutation": mutation})
-                    world = list(out.values())[0]
-                    world[0, 0] += np.random.rand(H_GRID, W_GRID) * 0.02
-                    world[0, 0] = np.clip(world[0,0], 0.0, 1.0)
-                    tick_count += 1
-            else:
-                for _ in range(speed_mode):
-                    mutation = (np.random.randn(1, CH_WEIGHTS, H_GRID, W_GRID) * 0.1).astype(np.float32)
-                    out = model.predict({"world": world, "mutation": mutation})
-                    world = list(out.values())[0]
-                    world[0, 0] += np.random.rand(H_GRID, W_GRID) * 0.02
-                    world[0, 0] = np.clip(world[0,0], 0.0, 1.0)
-                    tick_count += 1
 
         # Adaptive auto-save interval based on game speed to ensure ~1 save per second
         if speed_mode == 1: save_interval = 60
@@ -949,35 +984,45 @@ def main():
 
         # Strategy Space (Live PCA over Neural Weights)
         if pop > 3:
-            # Flatten population weights to (pop, 15)
-            W_pop = weights[:, y_idx, x_idx].T
-            W_cen = W_pop - W_pop.mean(axis=0)
+            pca_h = 115
+            screen.blit(font.render("STRATEGY space  (W_wight PCA)", True, (220, 230, 255)), (hud_x, stats_y)); stats_y += 15
+
             try:
-                # Top 2 components via SVD
-                u, s, vh = np.linalg.svd(W_cen, full_matrices=False)
-                proj = np.dot(W_cen, vh[:2].T)
+                # Cache expensive PCA computation to update at most every 10 ticks
+                if tick_count > cached_pca_tick + 10 or cached_pca_surf is None:
+                    cached_pca_surf = pygame.Surface((rw, pca_h))
+                    cached_pca_surf.fill((20, 20, 25))
+                    pygame.draw.rect(cached_pca_surf, (40, 40, 50), (0, 0, rw, pca_h), 1)
 
-                screen.blit(font.render("STRATEGY space  (W_wight PCA)", True, (220, 230, 255)), (hud_x, stats_y)); stats_y += 15
-                pca_h = 115
-                pygame.draw.rect(screen, (20, 20, 25), (hud_x, stats_y, rw, pca_h))
-                pygame.draw.rect(screen, (40, 40, 50), (hud_x, stats_y, rw, pca_h), 1)
+                    # Flatten population weights to (pop, 15)
+                    W_pop = weights[:, y_idx, x_idx].T
+                    W_cen = W_pop - W_pop.mean(axis=0)
 
-                p_min = proj.min(axis=0)
-                p_max = proj.max(axis=0)
-                span = p_max - p_min
-                span[span < 1e-6] = 1.0 # prevent div zero
+                    # Top 2 components via SVD
+                    u, s, vh = np.linalg.svd(W_cen, full_matrices=False)
+                    proj = np.dot(W_cen, vh[:2].T)
 
-                for i in range(pop):
-                    lid = int(np.argmax(W_pop[i, :12]))
-                    x_c = int(hud_x + 5 + (proj[i, 0] - p_min[0]) / span[0] * (rw - 10))
-                    y_c = int(stats_y + 5 + (proj[i, 1] - p_min[1]) / span[1] * (pca_h - 10))
-                    # Draw lineage color dots into the strategy space
-                    screen.set_at((x_c, y_c), _LINEAGE_COLORS[lid])
-                    screen.set_at((x_c+1, y_c), _LINEAGE_COLORS[lid])
-                    screen.set_at((x_c, y_c+1), _LINEAGE_COLORS[lid])
-                    screen.set_at((x_c+1, y_c+1), _LINEAGE_COLORS[lid])
+                    p_min = proj.min(axis=0)
+                    p_max = proj.max(axis=0)
+                    span = p_max - p_min
+                    span[span < 1e-6] = 1.0 # prevent div zero
+
+                    for i in range(pop):
+                        lid = int(np.argmax(W_pop[i, :12]))
+                        x_c = int(5 + (proj[i, 0] - p_min[0]) / span[0] * (rw - 10))
+                        y_c = int(5 + (proj[i, 1] - p_min[1]) / span[1] * (pca_h - 10))
+
+                        # Draw lineage color dots into the strategy space
+                        cached_pca_surf.set_at((x_c, y_c), _LINEAGE_COLORS[lid])
+                        cached_pca_surf.set_at((x_c+1, y_c), _LINEAGE_COLORS[lid])
+                        cached_pca_surf.set_at((x_c, y_c+1), _LINEAGE_COLORS[lid])
+                        cached_pca_surf.set_at((x_c+1, y_c+1), _LINEAGE_COLORS[lid])
+                    cached_pca_tick = tick_count
             except:
                 pass
+
+            if cached_pca_surf:
+                screen.blit(cached_pca_surf, (hud_x, stats_y))
             stats_y += pca_h + 10
 
         # Neural Weights Map
