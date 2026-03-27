@@ -57,7 +57,7 @@ Running simulation headless for 1200 ticks...
 Because the organism *is* strictly its mathematical intent, the UI provides specialized telemetry to observe populations at both the macro and absolute micro scale:
 
 1. **Wight Inspector:** Hover your mouse over the ecosystem to lock onto a single living wight. The inspector tracks that organism's geographic coordinates over time, decodes its 15-channel brain into a real-time bar graph, and retains post-mortem diagnostics (`[DEAD]`) when its energy inevitably hits zero.
-2. **Weight Heatmaps:** Tracks the 10th to 90th percentile of the entire population's brain matrices. Unoptimized species render as static **Green** `[0.0]`. Over thousands of generations, survival pressure forces the global distributions to stretch into heavy **Blue** (inhibitory) and **Red** (excitatory) extremes.
+2. **Weight Heatmaps:** Tracks the 10th to 90th percentile of the entire population's brain matrices. Unoptimized lineages render as static **Green** `[0.0]`. Over thousands of generations, survival pressure forces the global distributions to stretch into heavy **Blue** (inhibitory) and **Red** (excitatory) extremes.
 3. **Live Subject PCA:** A real-time Principal Component Analysis compresses the 15-dimensional strategy space into a 2-dimensional scatter plot so you can watch speciation in real time.
 4. **Emergence Log:** A scrolling real-time event ticker tags macro-evolutionary milestones as they occur—like population bottlenecks, metabolism breakthroughs, or biological immortality.
 
