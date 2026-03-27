@@ -412,7 +412,6 @@ def _save_worker(filepath, world_copy, tick, seed_str, rng_copy, ui_prev_copy, u
         lineage_history=np.array(history_copy, dtype=object),
         ui_flags=np.array(list(flags_copy), dtype=object)
     )
-    print(f"Background save committed to {filepath}")
 
 def save_state(filepath, world, tick, seed_str, rng_state, ui_prev, ui_events, lineage_history, ui_flags):
     import threading
@@ -590,6 +589,7 @@ def main():
     speed_mode = 1
     print("\nSimulation Started!")
     print(" - Clicking spawns an organism.")
+    print(" - S takes a screenshot.")
     print(" - SPACE pauses/resumes.")
     print(" - Keys 1-5 adjust speed (1x, 5x, 20x, 100x, MAX).")
 
