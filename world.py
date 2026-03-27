@@ -330,12 +330,18 @@ def evaluate_milestones(pop, max_age, avg_drain, total_food, lineage_counts, pre
                 events.append(f"lineage {dom_id} has become the dominant lineage ({int(dom_pct*100)}% of population)")
                 prev_state['dom'] = dom_id
 
+        # Establish lineages that are viable enough to be tracked
+        for lid, count in lineage_counts.items():
+            if count >= 1:
+                flags.add(f"est_{lid}")
+
         # Extinction Events
         if prev_state['pop'] is not None and prev_state['pop'] > 0:
-            for lid, prev_count in prev_state['lineages'].items():
-                if prev_count > int(prev_state['pop'] * 0.05) and prev_count >= 10: # Was at least 5% and 10 pop
+            for lid in range(12):
+                if f"est_{lid}" in flags:
                     if lineage_counts.get(lid, 0) == 0:
                         events.append(f"lineage {lid} has gone completely extinct")
+                        flags.remove(f"est_{lid}")
 
     if max_age >= 1000 and 'age_1k' not in flags:
         events.append("longevity unlocked - max age > 1,000")
@@ -413,7 +419,7 @@ def main():
         t0 = time.time()
 
         _prev = {'pop': None, 'd_avg': None}
-        _flags = set()
+        _flags = set([f"est_{i}" for i in range(12)])
 
         i = 0
         while max_ticks is None or i < max_ticks:
@@ -472,7 +478,7 @@ def main():
     print(" - Keys 1-5 adjust speed (1x, 5x, 20x, 100x, MAX).")
 
     ui_prev = {'pop': None, 'd_avg': None}
-    ui_flags = set()
+    ui_flags = set([f"est_{i}" for i in range(12)])
     ui_events = []
     ui_events_scroll = 0
     last_inspected_wight = None
