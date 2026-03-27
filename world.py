@@ -457,46 +457,49 @@ def main():
         _flags = set([f"est_{i}" for i in range(12)])
         
         i = 0
-        while max_ticks is None or i < max_ticks:
-            mutation = (np.random.randn(1, CH_WEIGHTS, H_GRID, W_GRID) * 0.1).astype(np.float32)
-            out = model.predict({"world": world, "mutation": mutation})
-            world = list(out.values())[0]
-            
-            # Matched exactly to Pygame logic!
-            world[0, 0] += np.random.rand(H_GRID, W_GRID) * 0.02
-            world[0, 0] = np.clip(world[0,0], 0.0, 1.0)
-            
-            if i % 500 == 0 or (max_ticks and i == max_ticks - 1):
-                orgs = world[0, 1]
-                ages = world[0, 2]
-                drains = world[0, 3]
-                mask = orgs > 0
-                pop = mask.sum()
-                elapsed = time.time() - t0
-                if pop > 0:
-                    max_e = int(orgs[mask].max() * 100)
-                    avg_e = int(orgs[mask].mean() * 100)
-                    max_age = int(ages[mask].max())
-                    avg_age = int(ages[mask].mean())
-                    max_drain = int(drains[mask].max() * 100)
-                    avg_drain = int(drains[mask].mean() * 100)
-                    print(f"{i:8d} {pop:6d} {avg_e:6d} {max_e:6d} {avg_age:6d} {max_age:6d} {avg_drain:6d} {max_drain:6d}  {elapsed:.1f}s")
-                    
-                    total_food = int(world[0, 0].sum() * 100)
-                    alive_weights = world[0, 4:16][:, mask]
-                    lineages = np.argmax(alive_weights, axis=0) # shape (pop,)
-                    unique_lids, counts = np.unique(lineages, return_counts=True)
-                    lineage_counts = dict(zip([int(k) for k in unique_lids], [int(c) for c in counts]))
+        try:
+            while max_ticks is None or i < max_ticks:
+                mutation = (np.random.randn(1, CH_WEIGHTS, H_GRID, W_GRID) * 0.1).astype(np.float32)
+                out = model.predict({"world": world, "mutation": mutation})
+                world = list(out.values())[0]
+                
+                # Matched exactly to Pygame logic!
+                world[0, 0] += np.random.rand(H_GRID, W_GRID) * 0.02
+                world[0, 0] = np.clip(world[0,0], 0.0, 1.0)
+                
+                if i % 500 == 0 or (max_ticks and i == max_ticks - 1):
+                    orgs = world[0, 1]
+                    ages = world[0, 2]
+                    drains = world[0, 3]
+                    mask = orgs > 0
+                    pop = mask.sum()
+                    elapsed = time.time() - t0
+                    if pop > 0:
+                        max_e = int(orgs[mask].max() * 100)
+                        avg_e = int(orgs[mask].mean() * 100)
+                        max_age = int(ages[mask].max())
+                        avg_age = int(ages[mask].mean())
+                        max_drain = int(drains[mask].max() * 100)
+                        avg_drain = int(drains[mask].mean() * 100)
+                        print(f"{i:8d} {pop:6d} {avg_e:6d} {max_e:6d} {avg_age:6d} {max_age:6d} {avg_drain:6d} {max_drain:6d}  {elapsed:.1f}s")
+                        
+                        total_food = int(world[0, 0].sum() * 100)
+                        alive_weights = world[0, 4:16][:, mask]
+                        lineages = np.argmax(alive_weights, axis=0) # shape (pop,)
+                        unique_lids, counts = np.unique(lineages, return_counts=True)
+                        lineage_counts = dict(zip([int(k) for k in unique_lids], [int(c) for c in counts]))
 
-                    notes = evaluate_milestones(pop, avg_age, max_age, avg_drain, float(np.abs(alive_weights).max()), total_food, lineage_counts, _prev, _flags)
-                    for note in notes:
-                        print(f"          ↳ {note}")
+                        notes = evaluate_milestones(pop, avg_age, max_age, avg_drain, float(np.abs(alive_weights).max()), total_food, lineage_counts, _prev, _flags)
+                        for note in notes:
+                            print(f"          ↳ {note}")
 
-                else:
-                    print(f"{i:8d}      EXTINCT")
-                    break
-            
-            i += 1
+                    else:
+                        print(f"{i:8d}      EXTINCT")
+                        break
+                
+                i += 1
+        except KeyboardInterrupt:
+            print("\nHeadless run interrupted by user.")
         
         t1 = time.time()
         fps = i / max(1e-6, t1 - t0)
