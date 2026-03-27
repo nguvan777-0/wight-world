@@ -510,7 +510,7 @@ def main():
             pygame.draw.circle(screen, c, (cx, cy), r)
             pygame.draw.circle(screen, (255, 255, 255), (cx, cy), r, max(1, r//3))
             
-            # Orientation heuristic: sweeping white line mapped to continuous trait 0
+            # Orientation heuristic: sweeping white line mapped to neural weight 0
             ax = cx + int(np.cos(w[0] * np.pi) * r * 1.8)
             ay = cy + int(np.sin(w[0] * np.pi) * r * 1.8)
             pygame.draw.line(screen, (255, 255, 255), (cx, cy), (ax, ay), max(1, RENDER_SCALE//8))
@@ -699,9 +699,9 @@ def main():
                 pass
             stats_y += pca_h + 10
 
-        # Trait Map
+        # Neural Weights Map
         if pop > 0:
-            screen.blit(font.render("TRAITS (median | p10-p90 band)", True, (220, 230, 255)), (hud_x, stats_y)); stats_y += 15
+            screen.blit(font.render("NEURAL WEIGHTS (median | p10-p90 band)", True, (220, 230, 255)), (hud_x, stats_y)); stats_y += 15
             W_pop = weights[:, y_idx, x_idx].T # (pop, 15)
             if pop > 1:
                 p10 = np.percentile(W_pop, 10, axis=0)
@@ -710,7 +710,7 @@ def main():
             else:
                 p10 = med = p90 = W_pop[0]
                 
-            trait_names = [
+            weight_names = [
                 "Stay:Food", "Stay:Scent", "Stay:nrg",
                 "N:Food", "N:Scent", "N:nrg",
                 "S:Food", "S:Scent", "S:nrg",
@@ -733,7 +733,7 @@ def main():
             row_interval = max(11.0, available_h / 15.0)
             row_h = int(row_interval) - 1 # Leaves 1px pad between rows
             
-            for i, name in enumerate(trait_names):
+            for i, name in enumerate(weight_names):
                 y_baseline = stats_y + int(i * row_interval)
                 
                 # Text
@@ -796,13 +796,16 @@ def main():
             s = pygame.Surface((ev_w, ev_h), pygame.SRCALPHA)
             s.fill((16, 16, 24, 210)) # Semi-transparent dark
             pygame.draw.rect(s, (40, 40, 60, 255), s.get_rect(), 1)
-            screen.blit(s, (10, 10))
             
-            screen.blit(font.render("LIVE EVENTS", True, (255, 210, 120)), (20, 18))
-            e_y = 35 + font.get_height() // 2
+            box_x = 10
+            box_y = H_PX - ev_h - 10
+            screen.blit(s, (box_x, box_y))
+            
+            screen.blit(font.render("LIVE EVENTS", True, (255, 210, 120)), (box_x + 10, box_y + 8))
+            e_y = box_y + 25 + font.get_height() // 2
             line_spacing = font_sm.get_height() + 2
             for ev in ui_events:
-                screen.blit(font_sm.render(ev, True, (220, 230, 250)), (20, e_y))
+                screen.blit(font_sm.render(ev, True, (220, 230, 250)), (box_x + 10, e_y))
                 e_y += line_spacing
 
         pygame.display.flip()
