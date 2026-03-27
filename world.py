@@ -286,11 +286,11 @@ def drop_organism(world, gx, gy, lineage_id=None):
     world[0, 3, gy, gx] = 0.0 # Drain
     weights = np.random.randn(CH_WEIGHTS) * 4.0
     if lineage_id is not None and lineage_id < 12:
-        # Boost this specific weight so it dominates and locks in the founder's species color!
+        # Boost this specific weight so it dominates and locks in the founder's lineage color!
         weights[lineage_id] = 20.0
     world[0, 4:, gy, gx] = weights
 
-def evaluate_milestones(pop, max_age, avg_drain, prev_state, flags):
+def evaluate_milestones(pop, max_age, avg_drain, total_food, lineage_counts, prev_state, flags):
     """
     Evaluates ecological statistics to generate emergence events.
     Shared identically between Headless and UI rendering.
@@ -299,12 +299,44 @@ def evaluate_milestones(pop, max_age, avg_drain, prev_state, flags):
     """
     events = []
     
+    # Initialize missing state keys
+    for key in ['pop', 'd_avg', 'food', 'dom']:
+        if key not in prev_state:
+            prev_state[key] = None
+    if 'lineages' not in prev_state:
+        prev_state['lineages'] = {}
+    
     if prev_state['pop'] is not None:
         if pop < prev_state['pop'] * 0.5:
             events.append(f"population crash  {prev_state['pop']} -> {pop}")
         elif pop > prev_state['pop'] * 2.0:
             events.append(f"population boom  {prev_state['pop']} -> {pop}")
             
+        # Near-Extinction
+        if pop < 50 and prev_state['pop'] >= 50:
+            events.append(f"ecosystem collapse threshold: population critical (< 50)")
+            
+    if prev_state['food'] is not None:
+        if total_food < 100 and prev_state['food'] >= 100:
+            events.append("widespread famine: food resources exhausted")
+
+    # Speciation & Survival Tracking
+    if pop > 0 and len(lineage_counts) > 0:
+        # Dominance Shift
+        if pop > 100:
+            dom_id = max(lineage_counts, key=lineage_counts.get)
+            dom_pct = lineage_counts[dom_id] / pop
+            if dom_pct >= 0.60 and prev_state['dom'] != dom_id:
+                events.append(f"lineage {dom_id} has become the dominant lineage ({int(dom_pct*100)}% of population)")
+                prev_state['dom'] = dom_id
+                
+        # Extinction Events
+        if prev_state['pop'] is not None and prev_state['pop'] > 0:
+            for lid, prev_count in prev_state['lineages'].items():
+                if prev_count > int(prev_state['pop'] * 0.05) and prev_count >= 10: # Was at least 5% and 10 pop
+                    if lineage_counts.get(lid, 0) == 0:
+                        events.append(f"lineage {lid} has gone completely extinct")
+
     if max_age >= 1000 and 'age_1k' not in flags:
         events.append("longevity unlocked - max age > 1,000")
         flags.add('age_1k')
@@ -321,6 +353,8 @@ def evaluate_milestones(pop, max_age, avg_drain, prev_state, flags):
     # Update state history in place
     prev_state['pop'] = pop
     prev_state['d_avg'] = avg_drain
+    prev_state['food'] = total_food
+    prev_state['lineages'] = dict(lineage_counts)
     
     return events
 
@@ -407,7 +441,13 @@ def main():
                     avg_drain = int(drains[mask].mean() * 100)
                     print(f"{i:8d} {pop:6d} {avg_e:6d} {max_e:6d} {avg_age:6d} {max_age:6d} {avg_drain:6d} {max_drain:6d}  {elapsed:.1f}s")
                     
-                    notes = evaluate_milestones(pop, max_age, avg_drain, _prev, _flags)
+                    total_food = int(world[0, 0].sum() * 100)
+                    alive_weights = world[0, 4:16][:, mask]
+                    lineages = np.argmax(alive_weights, axis=0) # shape (pop,)
+                    unique_lids, counts = np.unique(lineages, return_counts=True)
+                    lineage_counts = dict(zip([int(k) for k in unique_lids], [int(c) for c in counts]))
+
+                    notes = evaluate_milestones(pop, max_age, avg_drain, total_food, lineage_counts, _prev, _flags)
                     for note in notes:
                         print(f"          ↳ {note}")
 
@@ -548,7 +588,7 @@ def main():
             
             # Simple analytical lineage clustering!
             # Since mitosis rarely flips the dominant weight, 
-            # argmax over the first 12 genes creates stable hereditary species.
+            # argmax over the first 12 genes creates stable hereditary lineages.
             lid = int(np.argmax(w[:12]))
             current_lineages[lid] += 1
             
@@ -631,14 +671,19 @@ def main():
             
             biomass = int(orgs[y_idx, x_idx].sum() * 100)
             
-            txt(f"POP: {pop:,}      BIO: {biomass:,}      FOOD: {total_food:,}", font_sm, (200, 255, 200))
-            stats_y += 4
+            c_g = (200, 255, 200)
+            screen.blit(font_sm.render(f"POP: {pop:,}", True, c_g), (px + 10, stats_y))
+            screen.blit(font_sm.render(f"BIO: {biomass:,}", True, c_g), (px + 120, stats_y))
+            screen.blit(font_sm.render(f"FOOD: {total_food:,}", True, c_g), (px + 230, stats_y))
+            stats_y += font_sm.get_height() + 8
             
             # Event Tracking
             if tick_count // 120 > last_event_tick // 120:
                 last_event_tick = tick_count
                 
-                new_events = evaluate_milestones(pop, max_age, avg_drain, ui_prev, ui_flags)
+                new_events = evaluate_milestones(
+                    pop, max_age, avg_drain, total_food, dict(current_lineages), ui_prev, ui_flags
+                )
                 for ev in new_events:
                     ui_events.append(f"[{tick_count}] {ev}")
                     
@@ -650,7 +695,11 @@ def main():
             trow(["Metabolism", min_drain, avg_drain, max_drain, std_drain], font_sm, (230, 230, 245))
             sep()
         else:
-            txt(f"POPULATION 0   BIOMASS 0   FOOD {total_food:,}", font_sm, (200, 255, 200))
+            c_g = (200, 255, 200)
+            screen.blit(font_sm.render(f"POP: 0", True, c_g), (px + 10, stats_y))
+            screen.blit(font_sm.render(f"BIO: 0", True, c_g), (px + 120, stats_y))
+            screen.blit(font_sm.render(f"FOOD: {total_food:,}", True, c_g), (px + 230, stats_y))
+            stats_y += font_sm.get_height() + 8
             sep()
         
         # LINEAGES Over Time (Rainbow Stacked Area Chart)
@@ -668,7 +717,7 @@ def main():
                 lx1 = rx + int((t_idx + 1) * rw / T)
                 bot = ry + rh
                 
-                # Draw vertical sliver for each species
+                # Draw vertical sliver for each lineage
                 for aid in all_ids:
                     count = frame.get(aid, 0)
                     if count == 0: continue
@@ -822,6 +871,19 @@ def main():
         wrapped_lines = []
         max_width = LOG_WIDTH - 20
         for ev in ui_events:
+            # Color coding keywords!
+            ev_lower = ev.lower()
+            if any(w in ev_lower for w in ["longevity", "immortality"]):
+                c = (255, 215, 0) # Gold
+            elif any(w in ev_lower for w in ["crash", "extinct", "famine", "collapse"]):
+                c = (255, 80, 80) # Red
+            elif any(w in ev_lower for w in ["boom", "surging", "breakthrough"]):
+                c = (100, 255, 100) # Green
+            elif "dominant" in ev_lower:
+                c = (100, 180, 255) # Blue
+            else:
+                c = (220, 230, 250) # Standard 
+            
             words = ev.split(' ')
             current_line = []
             for word in words:
@@ -829,10 +891,10 @@ def main():
                 if font_sm.size(' '.join(current_line))[0] > max_width:
                     current_line.pop()
                     if current_line:
-                        wrapped_lines.append(' '.join(current_line))
+                        wrapped_lines.append((' '.join(current_line), c))
                     current_line = [word]
             if current_line:
-                wrapped_lines.append(' '.join(current_line))
+                wrapped_lines.append((' '.join(current_line), c))
                 
         line_spacing = font_sm.get_height() + 4
         # Calculate max lines that fit above the inspector panel
@@ -846,8 +908,8 @@ def main():
 
         e_y = box_y + 25
         visible_lines = wrapped_lines[start_idx:start_idx + max_lines_fit]
-        for line in visible_lines:
-            screen.blit(font_sm.render(line, True, (220, 230, 250)), (box_x, e_y))
+        for line_text, line_color in visible_lines:
+            screen.blit(font_sm.render(line_text, True, line_color), (box_x, e_y))
             e_y += line_spacing
 
         # Wight Inspector
@@ -921,28 +983,28 @@ def main():
             pygame.draw.line(screen, (255, 255, 255), (pw, py), (ax, ay), 2)
             
             # Stats (Show DEAD tag if deceased)
-            spec_str = f"Species {lid}"
+            spec_str = f"Lineage {lid}"
             if wight.get('status') == 'DEAD':
                 spec_str += " [DEAD]"
                 c = (200, 80, 80)
                 
-            tx = 100
-            screen.blit(font_sm.render(spec_str, True, c), (tx, insp_y + 15))
-            screen.blit(font_sm.render(f"Energy: {wight['e']:.2f}", True, (220, 230, 250)), (tx, insp_y + 35))
-            screen.blit(font_sm.render(f"Age: {int(wight['a'])}", True, (220, 230, 250)), (tx, insp_y + 55))
-            screen.blit(font_sm.render(f"Met: {wight['d']:.2f}", True, (220, 230, 250)), (tx + 70, insp_y + 55))
+            tx = 105
+            screen.blit(font_sm.render(spec_str, True, c), (tx, insp_y + 10))
+            screen.blit(font_sm.render(f"Nrg: {wight['e']:.2f}", True, (220, 230, 250)), (tx, insp_y + 25))
+            screen.blit(font_sm.render(f"Age: {int(wight['a'])}", True, (220, 230, 250)), (tx, insp_y + 40))
+            screen.blit(font_sm.render(f"Met: {wight['d']:.2f}", True, (220, 230, 250)), (tx, insp_y + 55))
             
             # Brain Graph (15 values)
-            w_y = insp_y + 85
+            w_y = insp_y + 80
             for i, name in enumerate(WEIGHT_NAMES):
                 val = w_val[i]
                 percent = (val + 8) / 16.0
-                tw = int(percent * 100)
-                tw = max(0, min(100, tw))
+                tw = int(percent * 85)
+                tw = max(0, min(85, tw))
                 screen.blit(font_sm.render(f"{name}", True, (200, 200, 220)), (5, w_y))
                 bar_color = get_lerp_color(percent)
-                pygame.draw.rect(screen, bar_color, (75, w_y + 2, tw, 8))
-                screen.blit(font_sm.render(f"{val:>5.1f}", True, (200, 200, 220)), (180, w_y))
+                pygame.draw.rect(screen, bar_color, (85, w_y + 2, tw, 8))
+                screen.blit(font_sm.render(f"{val:>5.1f}", True, (200, 200, 220)), (175, w_y))
                 w_y += 15
         else:
             screen.blit(font_sm.render("Hover over matrix to inspect.", True, (120, 120, 130)), (10, insp_y + 25))
