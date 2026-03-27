@@ -404,10 +404,12 @@ def main():
     parser = argparse.ArgumentParser(description="wight-world neuroevolution engine")
     parser.add_argument("--headless", action="store_true", help="Run in terminal without UI")
     parser.add_argument("--ticks", type=int, default=None, help="Number of ticks to run (default: infinite)")
+    parser.add_argument("--interval", type=int, default=500, help="Tick interval for logging in headless mode (default: 500)")
     args = parser.parse_args()
     
     is_headless = args.headless
     max_ticks = args.ticks
+    interval = args.interval
 
     if not is_headless:
         pygame.init()
@@ -467,7 +469,7 @@ def main():
                 world[0, 0] += np.random.rand(H_GRID, W_GRID) * 0.02
                 world[0, 0] = np.clip(world[0,0], 0.0, 1.0)
                 
-                if i % 500 == 0 or (max_ticks and i == max_ticks - 1):
+                if i % interval == 0 or (max_ticks and i == max_ticks - 1):
                     orgs = world[0, 1]
                     ages = world[0, 2]
                     drains = world[0, 3]
