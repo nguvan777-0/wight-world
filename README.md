@@ -41,17 +41,18 @@ Running simulation headless for 120 ticks...
     tick    pop  e_avg  e_max  a_avg  a_max  d_avg  d_max  elapsed
 ────────────────────────────────────────────────────────────────────────
        0     24     50     50      0      1      0      1  0.0s
-      30    155     51     79     11     31     11     31  0.0s
-          ↳ population boom  24 -> 155
-      60    290     52     79     15     61     15     60  0.1s
-          ↳ lineage 1 has gone completely extinct
-          ↳ lineage 11 has gone completely extinct
-      90    431     53     79     21     91     21     90  0.1s
-          ↳ bottleneck recovery: lineage 3 has resurged from a critical population low
+      30    170     51     79      9     31      9     31  0.0s
+          ↳ population boom  24 -> 170
+      60    384     53     79     15     61     15     60  0.1s
+          ↳ population boom  170 -> 384
+          ↳ bottleneck recovery: lineage 0 has resurged from a critical population low
+          ↳ bottleneck recovery: lineage 7 has resurged from a critical population low
+      90    596     57     79     21     91     21     90  0.1s
           ↳ bottleneck recovery: lineage 4 has resurged from a critical population low
-     119    421     54     79     29    120     29    118  0.1s
+     119    499     56     79     38    120     37    118  0.1s
+          ↳ lineage 0 has become the dominant lineage (62% of population)
 ────────────────────────────────────────────────────────────────────────
-120 ticks  0.1s  1,086 t/s
+120 ticks  0.1s  872 t/s
 ```
 
 

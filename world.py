@@ -360,14 +360,6 @@ def evaluate_milestones(pop, avg_age, max_age, avg_drain, max_weight_abs, total_
                 events.append(f"bottleneck recovery: lineage {lid} has resurged from a critical population low")
                 flags.remove(f"endangered_{lid}")
 
-        # Extinction Events
-        if prev_state['pop'] is not None and prev_state['pop'] > 0:
-            for lid in range(12):
-                if f"est_{lid}" in flags:
-                    if lineage_counts.get(lid, 0) == 0:
-                        events.append(f"lineage {lid} has gone completely extinct")
-                        flags.remove(f"est_{lid}")
-
     if max_age >= 1000 and 'age_1k' not in flags:
         events.append("longevity unlocked - max age > 1,000")
         flags.add('age_1k')
@@ -560,11 +552,20 @@ def main():
                         unique_lids, counts = np.unique(lineages, return_counts=True)
                         lineage_counts = dict(zip([int(k) for k in unique_lids], [int(c) for c in counts]))
 
+                        if _prev.get('lineages'):
+                            for lid in _prev['lineages']:
+                                if lid not in lineage_counts:
+                                    print(f"          ↳ lineage {lid} has gone extinct")
+
                         notes = evaluate_milestones(pop, avg_age, max_age, avg_drain, float(np.abs(alive_weights).max()), total_food, lineage_counts, _prev, _flags)
                         for note in notes:
                             print(f"          ↳ {note}")
 
                     else:
+                        if _prev.get('lineages'):
+                            for lid in _prev['lineages']:
+                                print(f"          ↳ lineage {lid} has gone extinct")
+                            _prev['lineages'] = {}
                         print(f"{i:8d}      EXTINCT")
                         break
 
@@ -753,6 +754,16 @@ def main():
             pygame.draw.line(screen, (255, 255, 255), (cx, cy), (ax, ay), max(1, RENDER_SCALE//8))
 
         if not paused:
+            # Check for newly extinct lineages using the UI render history
+            if len(lineage_history) > 0:
+                prev_lineages = lineage_history[-1]
+                for lid in prev_lineages:
+                    if lid not in current_lineages:
+                        ui_events.append(f"[{tick_count}] lineage {lid} has gone extinct")
+
+                if len(ui_events) > 200:
+                    ui_events = ui_events[-200:]
+
             lineage_history.append(dict(current_lineages))
 
         # 3. Draw Side HUD
@@ -862,6 +873,20 @@ def main():
             screen.blit(font_sm.render(f"BIO: 0", True, c_g), (px + 120, stats_y))
             screen.blit(font_sm.render(f"FOOD: {total_food:,}", True, c_g), (px + 230, stats_y))
             stats_y += font_sm.get_height() + 8
+
+            # Event Tracking: Trigger final extinction events if pop just hit 0
+            if not paused and ui_prev['pop'] is not None and ui_prev['pop'] > 0:
+                if len(lineage_history) > 0:
+                    prev_lineages = lineage_history[-1]
+                    for lid in prev_lineages:
+                        ui_events.append(f"[{tick_count}] lineage {lid} has gone extinct")
+
+                    if prev_lineages:
+                        ui_events.append(f"[{tick_count}] global extinction: population has reached zero")
+
+                ui_events = ui_events[-200:]
+                ui_prev['pop'] = 0
+
             sep()
 
         # LINEAGES Over Time (Rainbow Stacked Area Chart)
@@ -1138,7 +1163,7 @@ def main():
             c = _LINEAGE_COLORS[lid]
 
             # Big portrait
-            pw, py = 65, insp_y + 45
+            pw, py = 45, insp_y + 45
             pygame.draw.circle(screen, c, (pw, py), 30)
             pygame.draw.circle(screen, (255, 255, 255), (pw, py), 30, 2)
             ax = pw + int(np.cos(w_val[0] * np.pi) * 30 * 1.0)
@@ -1151,7 +1176,7 @@ def main():
                 spec_str += " [DEAD]"
                 c = (200, 80, 80)
 
-            tx = 105
+            tx = 85
             screen.blit(font_sm.render(spec_str, True, c), (tx, insp_y + 10))
             screen.blit(font_sm.render(f"Nrg: {wight['e']:.2f}", True, (220, 230, 250)), (tx, insp_y + 25))
             screen.blit(font_sm.render(f"Age: {int(wight['a'])}", True, (220, 230, 250)), (tx, insp_y + 40))
@@ -1162,12 +1187,13 @@ def main():
             for i, name in enumerate(WEIGHT_NAMES):
                 val = w_val[i]
                 percent = (val + 8) / 16.0
-                tw = int(percent * 85)
-                tw = max(0, min(85, tw))
+                tw = int(percent * 70)
+                tw = max(0, min(70, tw))
                 screen.blit(font_sm.render(f"{name}", True, (200, 200, 220)), (5, w_y))
                 bar_color = get_lerp_color(percent)
-                pygame.draw.rect(screen, bar_color, (85, w_y + 2, tw, 8))
-                screen.blit(font_sm.render(f"{val:>5.1f}", True, (200, 200, 220)), (175, w_y))
+                pygame.draw.rect(screen, bar_color, (80, w_y + 2, tw, 8))
+                val_surf = font_sm.render(f"{val:>5.1f}", True, (200, 200, 220))
+                screen.blit(val_surf, (LOG_WIDTH - val_surf.get_width() - 6, w_y))
                 w_y += 15
         else:
             screen.blit(font_sm.render("Hover over matrix to inspect.", True, (120, 120, 130)), (10, insp_y + 25))
