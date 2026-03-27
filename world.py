@@ -2,6 +2,12 @@ import os
 import sys
 import time
 import argparse
+import hashlib
+import random
+import string
+import collections
+import threading
+import copy
 import numpy as np
 
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
@@ -84,7 +90,7 @@ def mb_circular_pad(x):
 def build_evolution_engine():
     """Builds the hardware evolution engine: one forward pass advances the entire evolutionary ecosystem on the ANE."""
     kernels = create_pull_kernels()
-    pull_k_org = [np.repeat(k, CH_ORG, axis=0) for k in kernels]     # Shift the 16 organism channels
+    pull_k_org = [np.repeat(k, CH_ORG, axis=0) for k in kernels]     # Shift the wight channels
     pull_k_int = [np.repeat(k, 5, axis=0) for k in kernels]          # Shift the 5 intention output channels
 
     # Simple uniform blur for food sensing
@@ -99,7 +105,7 @@ def build_evolution_engine():
         food_layer = mb.slice_by_index(x=world, begin=[0,0,0,0], end=[1,1,H_GRID,W_GRID])
         org_layer  = mb.slice_by_index(x=world, begin=[0,1,0,0], end=[1,CH_TOTAL,H_GRID,W_GRID])
         energy     = mb.slice_by_index(x=org_layer, begin=[0,0,0,0], end=[1,1,H_GRID,W_GRID])
-        # Age and Energy_Drain are ignored by the brain but carried by the organism
+        # Age and Energy_Drain are ignored by the brain but carried by the wight
         weights    = mb.slice_by_index(x=org_layer, begin=[0,3,0,0], end=[1,CH_ORG,H_GRID,W_GRID])
 
         # 2. SENSING
@@ -108,7 +114,7 @@ def build_evolution_engine():
         blur_food = mb.conv(x=pad_food, weight=k_blur, pad_type="valid")
         senses = [food_layer, blur_food, energy] # 3 Inputs to the neural net
 
-        # 3. ORGANISM BRAIN (Map 3 Senses -> 5 Intentions)
+        # 3. WIGHT BRAIN (Map 3 Senses -> 5 Intentions)
         intent_channels = []
         for out_idx in range(5):
             net = None
@@ -139,12 +145,12 @@ def build_evolution_engine():
         raw_intent_1hot = mb.concat(values=onehot_channels, axis=1) # Shape: (1, 5, H, W)
 
         # Prevent completely empty background cells from generating empty-cell movement intentions
-        # that secretly steal priority in the tensor collision ladder and delete living organisms!
+        # that interfere with the collision ladder and overwrite living wights
         has_energy = mb.cast(x=mb.greater(x=energy, y=np.float32(0.0)), dtype="fp32")
         intent_1hot = mb.mul(x=raw_intent_1hot, y=has_energy)
 
         # 5. SHIFT-AND-MASK TO RESOLVE MOVEMENT
-        # Mode "circular" creates a Torus geometry: organisms walking off the right edge
+        # Mode "circular" creates a Torus geometry: wights walking off the right edge
         # wrap into the left edge.
         pad_org = mb_circular_pad(org_layer)
         pad_int = mb_circular_pad(intent_1hot)
@@ -279,8 +285,8 @@ def init_world():
     world[0, 0] = np.random.rand(H_GRID, W_GRID) * 0.3    # Wild food
     return world
 
-def drop_organism(world, gx, gy, lineage_id=None):
-    """Spawns an organism with fully random brain weights."""
+def drop_wight(world, gx, gy, lineage_id=None):
+    """Spawns a wight with fully random brain weights."""
     world[0, 1, gy, gx] = 1.0 # Max Energy
     world[0, 2, gy, gx] = 0.0 # Age
     world[0, 3, gy, gx] = 0.0 # Drain
@@ -390,8 +396,9 @@ def evaluate_milestones(pop, avg_age, max_age, avg_drain, max_weight_abs, total_
     prev_state['lineages'] = dict(lineage_counts)
 
     return events
+
+
 def _save_worker(filepath, world_copy, tick, seed_str, rng_copy, ui_prev_copy, ui_events_copy, history_copy, flags_copy):
-    import os
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     np.savez_compressed(
         filepath,
@@ -406,8 +413,6 @@ def _save_worker(filepath, world_copy, tick, seed_str, rng_copy, ui_prev_copy, u
     )
 
 def save_state(filepath, world, tick, seed_str, rng_state, ui_prev, ui_events, lineage_history, ui_flags):
-    import threading
-    import copy
     world_copy = world.copy()
     rng_copy = copy.deepcopy(rng_state)
     ui_prev_copy = copy.deepcopy(ui_prev)
@@ -429,7 +434,6 @@ def load_state(filepath):
     ui_prev = data['ui_prev'][0]
     ui_events = list(data['ui_events'])
 
-    import collections
     lineage_history = collections.deque(list(data['lineage_history']), maxlen=280)
     ui_flags = set(data['ui_flags'])
 
@@ -449,14 +453,9 @@ def main():
     max_ticks = args.ticks
     interval = args.interval
 
-    import hashlib
-    import random
-    import string
-
     if args.load is not None:
         world, start_tick, seed_str, state_prev, state_events, state_history, state_flags = load_state(args.load)
         print(f"\n[ wight-world | Resuming State: {args.load} | seed: '{seed_str}' ]")
-        import collections
     else:
         seed_str = args.seed
         if seed_str is None:
@@ -471,7 +470,6 @@ def main():
         state_prev = {'pop': None, 'd_avg': None}
         state_flags = set([f"est_{i}" for i in range(12)])
         state_events = []
-        import collections
         state_history = collections.deque(maxlen=280)
 
     if not is_headless:
@@ -506,7 +504,7 @@ def main():
         world = init_world()
         # Spawn 12 starting founders, seeding the 12 rainbow lineages
         for i in range(12):
-            drop_organism(world, np.random.randint(W_GRID), np.random.randint(H_GRID), lineage_id=i)
+            drop_wight(world, np.random.randint(W_GRID), np.random.randint(H_GRID), lineage_id=i)
 
     if is_headless:
         duration_str = f"{max_ticks:,} ticks" if max_ticks else "forever"
@@ -571,7 +569,6 @@ def main():
 
                 # Headless runs at maximum computational speed, so a 5,000 tick interval is roughly ~2-4 seconds.
                 if i > 0 and i % 5000 == 0:
-                    import collections
                     save_state(f"saves/wight-world_{seed_str}.npz", world, i, seed_str, np.random.get_state(), _prev, [], collections.deque(), _flags)
 
                 i += 1
@@ -589,10 +586,11 @@ def main():
     paused = False
     speed_mode = 1
     print("\nSimulation Started!")
-    print(" - Clicking spawns an organism.")
-    print(" - S takes a screenshot.")
-    print(" - SPACE pauses/resumes.")
-    print(" - Keys 1-5 adjust speed (1x, 5x, 20x, 100x, MAX).")
+    print(" - Clicking spawns a wight")
+    print(" - S takes a screenshot")
+    print(" - R restarts world with new seed")
+    print(" - SPACE pauses/resumes")
+    print(" - Keys 1-5 adjust speed (1x, 5x, 20x, 100x, MAX)")
 
     ui_prev = state_prev
     ui_flags = state_flags
@@ -614,26 +612,37 @@ def main():
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE or getattr(event, 'unicode', '') == ' ':
                     paused = not paused
+                    print("Paused world" if paused else "Resumed world")
                 elif event.key in (pygame.K_1, pygame.K_KP1) or getattr(event, 'unicode', '') == '1':
                     speed_mode = 1
                     paused = False
+                    print("Set speed to 1x")
                 elif event.key in (pygame.K_2, pygame.K_KP2) or getattr(event, 'unicode', '') == '2':
                     speed_mode = 5
                     paused = False
+                    print("Set speed to 5x")
                 elif event.key in (pygame.K_3, pygame.K_KP3) or getattr(event, 'unicode', '') == '3':
                     speed_mode = 20
                     paused = False
+                    print("Set speed to 20x")
                 elif event.key in (pygame.K_4, pygame.K_KP4) or getattr(event, 'unicode', '') == '4':
                     speed_mode = 100
                     paused = False
+                    print("Set speed to 100x")
                 elif event.key in (pygame.K_5, pygame.K_KP5) or getattr(event, 'unicode', '') == '5':
                     speed_mode = 'MAX'
                     paused = False
+                    print("Set speed to MAX")
                 elif event.key == pygame.K_r or getattr(event, 'unicode', '').lower() == 'r':
                     flash_r = 15
+                    seed_str = "".join(random.choices(string.ascii_letters, k=6))
+                    seed_int = int(hashlib.sha256(seed_str.encode('utf-8')).hexdigest(), 16) % (2**32)
+                    np.random.seed(seed_int)
+                    print(f"\n[ wight-world | seed: '{seed_str}' ]")
+                    print("Restarted world")
                     world = init_world()
                     for i in range(12):
-                        drop_organism(world, np.random.randint(W_GRID), np.random.randint(H_GRID), lineage_id=i)
+                        drop_wight(world, np.random.randint(W_GRID), np.random.randint(H_GRID), lineage_id=i)
                     tick_count = 0
                     last_event_tick = 0
                     ui_prev = {'pop': None, 'd_avg': None}
@@ -644,7 +653,6 @@ def main():
                     last_inspected_wight = None
                 elif event.key == pygame.K_s or getattr(event, 'unicode', '').lower() == 's':
                     flash_s = 15
-                    import os
                     os.makedirs("screenshots", exist_ok=True)
                     filename = f"screenshots/wight-world_{seed_str}_{tick_count}.png"
                     pygame.image.save(screen, filename)
@@ -658,10 +666,11 @@ def main():
                 if LOG_WIDTH <= event.pos[0] < LOG_WIDTH + W_PX:
                     gx = np.clip((event.pos[0] - LOG_WIDTH) // RENDER_SCALE, 0, W_GRID - 1)
                     gy = np.clip(event.pos[1] // RENDER_SCALE, 0, H_GRID - 1)
-                    # Drop an organism with random genes
-                    drop_organism(world, gx, gy)
+                    # Drop a wight with random genes
+                    drop_wight(world, gx, gy)
                     # Drop some large food nearby
                     world[0, 0, max(0,gy-2):min(H_GRID,gy+2), max(0,gx-2):min(W_GRID,gx+2)] += 1.0
+                    print(f"Spawned a wight at ({gx}, {gy})")
 
         # Hover tracking for Wight Inspector
         mx, my = pygame.mouse.get_pos()
@@ -716,7 +725,7 @@ def main():
         # Blit main matrix
         screen.blit(surf_scaled, (LOG_WIDTH, 0))
 
-        # 2. Draw Organisms dynamically
+        # 2. Draw Wights
         orgs = t[1]
         ages = t[2]
         drains = t[3]
@@ -889,8 +898,8 @@ def main():
 
             sep()
 
-        # LINEAGES Over Time (Rainbow Stacked Area Chart)
-        txt("LINEAGES over time", font, (255, 210, 120))
+        # LINEAGES over time (Rainbow Stacked Area Chart)
+        txt("LINEAGE river", font, (255, 210, 120))
         rx, ry, rw, rh = px + 8, stats_y, HUD_WIDTH - 16, 95
 
         pygame.draw.rect(screen, (20, 20, 25), (rx, ry, rw, rh))
@@ -948,7 +957,7 @@ def main():
                 u, s, vh = np.linalg.svd(W_cen, full_matrices=False)
                 proj = np.dot(W_cen, vh[:2].T)
 
-                screen.blit(font.render("STRATEGY SPACE  (W_wight PCA)", True, (220, 230, 255)), (hud_x, stats_y)); stats_y += 15
+                screen.blit(font.render("STRATEGY space  (W_wight PCA)", True, (220, 230, 255)), (hud_x, stats_y)); stats_y += 15
                 pca_h = 115
                 pygame.draw.rect(screen, (20, 20, 25), (hud_x, stats_y, rw, pca_h))
                 pygame.draw.rect(screen, (40, 40, 50), (hud_x, stats_y, rw, pca_h), 1)
@@ -973,7 +982,7 @@ def main():
 
         # Neural Weights Map
         if pop > 0:
-            screen.blit(font.render("NEURAL WEIGHTS (median | p10-p90 band)", True, (220, 230, 255)), (hud_x, stats_y)); stats_y += 15
+            screen.blit(font.render("NEURAL weights (median | p10-p90 band)", True, (220, 230, 255)), (hud_x, stats_y)); stats_y += 15
             W_pop = weights[:, y_idx, x_idx].T # (pop, 15)
             if pop > 1:
                 p10 = np.percentile(W_pop, 10, axis=0)
@@ -1055,7 +1064,7 @@ def main():
         ui_right_edge = LOG_WIDTH - 8
 
         box_y = 10
-        screen.blit(font.render("EMERGENCE LOG", True, (255, 210, 120)), (ui_margin_x, box_y))
+        screen.blit(font.render("EMERGENCE log", True, (255, 210, 120)), (ui_margin_x, box_y))
 
         # Word Wrap Logic - fixed right boundary
         wrapped_lines = []
@@ -1105,7 +1114,7 @@ def main():
         # Wight Inspector
         insp_y = H_PX - 320
         pygame.draw.line(screen, (50, 50, 80), (ui_margin_x, insp_y - 15), (LOG_WIDTH - ui_margin_x, insp_y - 15), 1)
-        screen.blit(font.render("WIGHT INSPECTOR", True, (255, 210, 120)), (ui_margin_x, insp_y))
+        screen.blit(font.render("WIGHT inspector", True, (255, 210, 120)), (ui_margin_x, insp_y))
 
         # Remove clip explicitly before Matrix/Tracking logic that draws into main screen
         screen.set_clip(None)
@@ -1115,7 +1124,7 @@ def main():
             # Highlight hovered cell in matrix
             pygame.draw.rect(screen, (255, 255, 255), (LOG_WIDTH + hover_gx * RENDER_SCALE, hover_gy * RENDER_SCALE, RENDER_SCALE, RENDER_SCALE), 1)
 
-            # If hovered over a valid organism, snapshot it
+            # If hovered over a valid wight, snapshot it
             e_val = orgs[hover_gy, hover_gx]
             if e_val > 0.0:
                 is_hovering_live_cell = True

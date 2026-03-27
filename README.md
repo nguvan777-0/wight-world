@@ -71,17 +71,17 @@ Running simulation headless for 120 ticks...
 
 ## Controls
 
-- **Click** anywhere in the ecosystem to manually drop an organism and some food.
+- **Click** anywhere in the ecosystem to manually drop a wight and some food.
 - **Space** to pause/resume the simulation.
 - **1-5** to adjust simulation speed (1x, 5x, 20x, 100x, MAX).
-- **R** to reset the simulation.
+- **R** to restart world with new seed.
 - **S** to take a screenshot (saved to `screenshots/`).
 
 ## Observation Tools & Strategy Space
 
-Because the organism *is* strictly its mathematical intent, the UI provides specialized telemetry to observe populations at both the macro and absolute micro scale:
+Because the wight *is* its mathematical intent, the UI provides specialized telemetry to observe populations at both the macro and absolute micro scale:
 
-1. **Wight Inspector:** Hover your mouse over the ecosystem to lock onto a single living wight. The inspector tracks that organism's geographic coordinates over time, decodes its 15-channel brain into a real-time bar graph, and retains post-mortem diagnostics (`[DEAD]`) when its energy inevitably hits zero.
+1. **Wight Inspector:** Hover your mouse over the ecosystem to lock onto a single living wight. The inspector tracks that wight's geographic coordinates over time, decodes its 15-channel brain into a real-time bar graph, and retains post-mortem diagnostics (`[DEAD]`) when its energy inevitably hits zero.
 2. **Weight Heatmaps:** Tracks the 10th to 90th percentile of the entire population's brain matrices. Unoptimized lineages render as static **Green** `[0.0]`. Over thousands of generations, survival pressure forces the global distributions to stretch into heavy **Blue** (inhibitory) and **Red** (excitatory) extremes.
 3. **Live Subject PCA:** A real-time Principal Component Analysis compresses the 15-dimensional strategy space into a 2-dimensional scatter plot so you can watch speciation in real time.
 4. **Lineage Tracking:** A stacked area chart logs the population balance of the 12 founding lineages over time, visualizing crashes, booms, and lineages diverging.
