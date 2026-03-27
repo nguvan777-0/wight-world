@@ -1181,7 +1181,7 @@ def main():
                 pygame.draw.line(screen, (255, 50, 50), (pw-20, py-20), (pw+20, py+20), 3)
                 pygame.draw.line(screen, (255, 50, 50), (pw-20, py+20), (pw+20, py-20), 3)
 
-            tx1, tx2 = 85, 175
+            tx1, tx2 = 85, 200
             screen.blit(font.render(spec_str, True, c), (tx1, insp_y + 10))
 
             # Column 1
@@ -1230,6 +1230,40 @@ def main():
                 fav_dir = dirs[fav_dir_idx]
                 eval_str = f"Intent: {fav_dir}"
                 screen.blit(font_sm.render(eval_str, True, (120, 255, 120)), (10, r_y + 25))
+
+                # --- LOCAL SENSORY RADAR (5x5 viewport) ---
+                # Utilizes the empty space below the matrix to show immediate neighborhood
+                map_x = 110
+                map_y = r_y + 25
+                screen.blit(font_sm.render("Local Sensory Radar", True, head_c), (map_x - 10, map_y))
+
+                cell_s = 14
+                t_state = world[0]
+
+                # Draw a nice grid housing
+                grid_bg_x = map_x - 4
+                grid_bg_y = map_y + 20
+                pygame.draw.rect(screen, (40, 40, 50), (grid_bg_x, grid_bg_y, cell_s*5 + 7, cell_s*5 + 7), 1)
+
+                for dy in range(-2, 3):
+                    for dx in range(-2, 3):
+                        vx = (wight['x'] + dx) % W_GRID
+                        vy = (wight['y'] + dy) % H_GRID
+
+                        f_val = t_state[0, vy, vx]
+                        o_val = t_state[1, vy, vx]
+
+                        r_c = min(255, int(o_val * 255) + 30)
+                        g_c = min(255, int(f_val * 180) + 30)
+                        b_c = 40
+
+                        if dx == 0 and dy == 0:
+                            # highlight center (self) purely white
+                            r_c, g_c, b_c = 255, 255, 255
+
+                        sq_x = map_x + (dx + 2) * cell_s
+                        sq_y = map_y + 22 + (dy + 2) * cell_s
+                        pygame.draw.rect(screen, (r_c, g_c, b_c), (sq_x, sq_y, cell_s - 1, cell_s - 1))
         else:
             screen.blit(font_sm.render("Hover over matrix to inspect.", True, (120, 120, 130)), (10, insp_y + 25))
 
