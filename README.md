@@ -21,7 +21,7 @@ Because there are no arrays of objects to iterate through, time complexity is a 
 
 ## Let there be wight
 
-Requires Python 3.11+. The first run will evaluate the matrix graph and compile an ANE-optimized `.mlpackage` to the local `build/` directory. Subsequent boots load instantly from this hardware cache.
+Requires macOS Apple Silicon and Python 3.11+. The first run will evaluate the matrix graph and compile an ANE-optimized `.mlpackage` to the local `build/` directory. Subsequent boots load instantly from this hardware cache.
 
 ```bash
 uv run python world.py
@@ -50,7 +50,7 @@ Running simulation headless for 1200 ticks...
 1,200 ticks  1.0s  1,240 t/s
 ```
 
-`coremltools` pins the simulation to the ANE. If unavailable or on another OS, it seamlessly falls back to NumPy matrix math.
+`coremltools` pins the simulation strictly to the Apple Neural Engine. There is no CPU or cross-platform fallback; the physics engine natively requires Apple Silicon to execute.
 
 ## Speciation & Strategy Space
 
@@ -65,7 +65,7 @@ These clusters represent ecological niches forming natively within the latent sp
 
 ## Layout
 
-Because the physics, biology, and environment are just layers of the same tensor, the entire engine is beautifully compressed down to a solitary **712-line script**:
+Because the physics, biology, and environment are just layers of the same tensor, the entire engine is beautifully compressed down to a single Python script:
 
 `world.py` — The unified Core ML graph, tensor setup, runtime, and emergent Pygame renderer.
 

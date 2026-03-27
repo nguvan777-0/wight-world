@@ -5,8 +5,7 @@ description = "Natural selection through spatial 2D matrix convolutions"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "coremltools>=9.0; sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "coremltools>=9.0",
     "numpy>=2.4.3",
-    "plotly>=6.6.0",
     "pygame>=2.6.1",
 ]

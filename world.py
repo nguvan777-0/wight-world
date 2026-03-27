@@ -11,7 +11,8 @@ try:
     import coremltools as ct
     from coremltools.converters.mil import Builder as mb
 except ImportError:
-    print("Warning: coremltools not found. The model cannot be built.")
+    print("Error: coremltools is required. This simulation runs strictly on the Apple Neural Engine.")
+    sys.exit(1)
 
 # --- Configuration ---
 W_GRID, H_GRID = 64, 64
