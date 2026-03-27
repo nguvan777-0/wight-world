@@ -393,16 +393,50 @@ def main():
 
     running = True
     tick_count = 0
+    paused = False
+    speed_mode = 1
     print("\nSimulation Started!")
     print(" - Clicking spawns an organism.")
+    print(" - SPACE pauses/resumes.")
+    print(" - Keys 1-5 adjust speed (1x, 5x, 20x, 100x, MAX).")
     
     ui_prev = {'pop': None, 'd_avg': None}
     ui_flags = set()
     ui_events = []
     
+    last_event_tick = 0
+    
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT: running = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE or getattr(event, 'unicode', '') == ' ':
+                    paused = not paused
+                elif event.key in (pygame.K_1, pygame.K_KP1) or getattr(event, 'unicode', '') == '1':
+                    speed_mode = 1
+                    paused = False
+                elif event.key in (pygame.K_2, pygame.K_KP2) or getattr(event, 'unicode', '') == '2':
+                    speed_mode = 5
+                    paused = False
+                elif event.key in (pygame.K_3, pygame.K_KP3) or getattr(event, 'unicode', '') == '3':
+                    speed_mode = 20
+                    paused = False
+                elif event.key in (pygame.K_4, pygame.K_KP4) or getattr(event, 'unicode', '') == '4':
+                    speed_mode = 100
+                    paused = False
+                elif event.key in (pygame.K_5, pygame.K_KP5) or getattr(event, 'unicode', '') == '5':
+                    speed_mode = 'MAX'
+                    paused = False
+                elif event.key == pygame.K_r or getattr(event, 'unicode', '').lower() == 'r':
+                    world = init_world()
+                    for i in range(12):
+                        drop_organism(world, np.random.randint(W_GRID), np.random.randint(H_GRID), lineage_id=i)
+                    tick_count = 0
+                    last_event_tick = 0
+                    ui_prev = {'pop': None, 'd_avg': None}
+                    ui_flags.clear()
+                    ui_events.clear()
+                    lineage_history.clear()
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 gx = np.clip(event.pos[0] // RENDER_SCALE, 0, W_GRID - 1)
                 gy = np.clip(event.pos[1] // RENDER_SCALE, 0, H_GRID - 1)
@@ -411,14 +445,26 @@ def main():
                 # Drop some large food nearby
                 world[0, 0, max(0,gy-2):min(H_GRID,gy+2), max(0,gx-2):min(W_GRID,gx+2)] += 1.0
 
-        # Run strict 1-tick pass on Neural Engine
-        mutation = (np.random.randn(1, CH_WEIGHTS, H_GRID, W_GRID) * 0.1).astype(np.float32)
-        out = model.predict({"world": world, "mutation": mutation})
-        world = list(out.values())[0]
-        
-        # Background physics: global food regeneration bounds
-        world[0, 0] += np.random.rand(H_GRID, W_GRID) * 0.02
-        world[0, 0] = np.clip(world[0,0], 0.0, 1.0)
+        if not paused:
+            if speed_mode == 'MAX':
+                t_start = time.time()
+                # increased time allowance to 33ms so MAX spends roughly 1 whole frame heavily processing
+                # rather than constantly kicking back out to pygame render loop
+                while time.time() - t_start < 0.033:
+                    mutation = (np.random.randn(1, CH_WEIGHTS, H_GRID, W_GRID) * 0.1).astype(np.float32)
+                    out = model.predict({"world": world, "mutation": mutation})
+                    world = list(out.values())[0]
+                    world[0, 0] += np.random.rand(H_GRID, W_GRID) * 0.02
+                    world[0, 0] = np.clip(world[0,0], 0.0, 1.0)
+                    tick_count += 1
+            else:
+                for _ in range(speed_mode):
+                    mutation = (np.random.randn(1, CH_WEIGHTS, H_GRID, W_GRID) * 0.1).astype(np.float32)
+                    out = model.predict({"world": world, "mutation": mutation})
+                    world = list(out.values())[0]
+                    world[0, 0] += np.random.rand(H_GRID, W_GRID) * 0.02
+                    world[0, 0] = np.clip(world[0,0], 0.0, 1.0)
+                    tick_count += 1
         
         # Render visual channels
         t = world[0]
@@ -469,7 +515,8 @@ def main():
             ay = cy + int(np.sin(w[0] * np.pi) * r * 1.8)
             pygame.draw.line(screen, (255, 255, 255), (cx, cy), (ax, ay), max(1, RENDER_SCALE//8))
             
-        lineage_history.append(dict(current_lineages))
+        if not paused:
+            lineage_history.append(dict(current_lineages))
             
         # 3. Draw Side HUD
         px = W_PX
@@ -505,7 +552,7 @@ def main():
         screen.blit(title_surf, (px + 10, stats_y))
         
         # Stats moved to Title row
-        tick_surf = font_sm.render(f"tick {tick_count:,}   [ANE]   SPACE=cycle", True, (230, 230, 245))
+        tick_surf = font_sm.render(f"tick {tick_count:,}   [ANE]", True, (230, 230, 245))
         screen.blit(tick_surf, (px + 10 + title_surf.get_width() + 15, stats_y + 4))
         
         stats_y += font_lg.get_height() + 2
@@ -535,7 +582,9 @@ def main():
             stats_y += 4
             
             # Event Tracking
-            if tick_count % 120 == 0:
+            if tick_count // 120 > last_event_tick // 120:
+                last_event_tick = tick_count
+                
                 if ui_prev['pop'] is not None:
                     if pop < ui_prev['pop'] * 0.5:
                         ui_events.append(f"[{tick_count}] population crash  {ui_prev['pop']} -> {pop}")
@@ -680,7 +729,7 @@ def main():
                 return tuple(int(mid[j] + (hi[j] - mid[j]) * s) for j in range(3))
             
             # Dynamically compute row height based on remaining space
-            available_h = H_PX - stats_y - 5
+            available_h = H_PX - stats_y - 25
             row_interval = max(11.0, available_h / 15.0)
             row_h = int(row_interval) - 1 # Leaves 1px pad between rows
             
@@ -717,7 +766,28 @@ def main():
                 # Median marker
                 pygame.draw.rect(screen, color, (bar_x + xmed - 1, y_baseline, 3, row_h))
             
-            stats_y = H_PX
+            stats_y = H_PX - 20
+            
+        # Footer Controls
+        footer_y = H_PX - 20
+        pygame.draw.line(screen, (40, 40, 60), (px + 8, footer_y - 5), (px + HUD_WIDTH - 8, footer_y - 5), 1)
+        
+        c_x = px + 10
+        controls = [
+            ("SPC:pause", paused),
+            ("R:reset", False),
+            ("1:1x", not paused and speed_mode == 1),
+            ("2:5x", not paused and speed_mode == 5),
+            ("3:20x", not paused and speed_mode == 20),
+            ("4:100x", not paused and speed_mode == 100),
+            ("5:MAX", not paused and speed_mode == 'MAX')
+        ]
+        
+        for text, is_active in controls:
+            color = (255, 100, 100) if (is_active and "SPC" in text) else (255, 255, 255) if is_active else (120, 120, 130)
+            surf = font_sm.render(text, True, color)
+            screen.blit(surf, (c_x, footer_y))
+            c_x += surf.get_width() + 8
         
         # Event History Transparency Window
         if ui_events:
@@ -738,7 +808,6 @@ def main():
         pygame.display.flip()
         
         clock.tick(60)
-        tick_count += 1
         pygame.display.set_caption(f"wight-world - ANE Matrix Evolution | {clock.get_fps():.0f} FPS")
         
         if max_ticks is not None and tick_count >= max_ticks:
