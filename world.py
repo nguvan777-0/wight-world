@@ -455,7 +455,7 @@ def main():
 
     if args.load is not None:
         world, start_tick, seed_str, state_prev, state_events, state_history, state_flags = load_state(args.load)
-        print(f"\n[ wight-world | Resuming State: {args.load} | Seed: '{seed_str}' ]")
+        print(f"\n[ wight-world | Resuming State: {args.load} | seed: '{seed_str}' ]")
         import collections
     else:
         seed_str = args.seed
@@ -466,7 +466,7 @@ def main():
         # Deterministically hash the string to a 32-bit int for numpy
         seed_int = int(hashlib.sha256(seed_str.encode('utf-8')).hexdigest(), 16) % (2**32)
         np.random.seed(seed_int)
-        print(f"\n[ wight-world | Seed: '{seed_str}' ]")
+        print(f"\n[ wight-world | seed: '{seed_str}' ]")
         start_tick = 0
         state_prev = {'pop': None, 'd_avg': None}
         state_flags = set([f"est_{i}" for i in range(12)])

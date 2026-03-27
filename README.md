@@ -2,7 +2,7 @@
 
 wight-world is a neuroevolution engine that executes natural selection purely through image filters. Instead of modeling discrete virtual bodies, the organism here is a *wight*—a single living pixel made entirely of floating-point logic. The wight is exactly its weights.
 
-![Screenshot](https://github.com/nguvan777-0/wight-world/releases/download/screenshots/wight-world_KIlulh_157.png)
+![Screenshot](https://github.com/nguvan777-0/wight-world/releases/download/screenshots/wight-world_oTpBmD_140.png)
 
 > *Life thrives at the boundary of states. Inject an energy gradient into a static tensor, and the math will organize to transform it.*
 
@@ -29,33 +29,53 @@ Requires macOS Apple Silicon and Python 3.11+. The first run will evaluate the m
 uv run python world.py
 ```
 
+You can set a custom deterministic seed or load a previously saved `.npz` simulation state (the active simulation auto-saves to `saves/`):
+
+```bash
+uv run python world.py --seed hologram
+uv run python world.py --load saves/wight-world_hologram.npz
+```
+
 Or, bypass the UI and execute headlessly for a specific number of ticks to crunch the tensor math at hardware speed:
 
 ```bash
-uv run python world.py --headless --ticks 120 --interval 30
+uv run python world.py --headless --ticks 120 --interval 30 --seed genesis
 ```
 
 ```text
+[ wight-world | seed: 'genesis' ]
+
 Running simulation headless for 120 ticks...
 ────────────────────────────────────────────────────────────────────────
     tick    pop  e_avg  e_max  a_avg  a_max  d_avg  d_max  elapsed
 ────────────────────────────────────────────────────────────────────────
-       0     24     50     50      0      1      0      1  0.0s
-      30    170     51     79      9     31      9     31  0.0s
-          ↳ population boom  24 -> 170
-      60    384     53     79     15     61     15     60  0.1s
-          ↳ population boom  170 -> 384
-          ↳ bottleneck recovery: lineage 0 has resurged from a critical population low
-          ↳ bottleneck recovery: lineage 7 has resurged from a critical population low
-      90    596     57     79     21     91     21     90  0.1s
+       0     24     49     50      0      1      0      1  0.0s
+      30     97     53     79     13     31     14     31  0.0s
+          ↳ lineage 0 has gone extinct
+          ↳ population boom  24 -> 97
+      60    310     55     79     12     61     12     60  0.1s
+          ↳ lineage 9 has gone extinct
+          ↳ population boom  97 -> 310
           ↳ bottleneck recovery: lineage 4 has resurged from a critical population low
-     119    499     56     79     38    120     37    118  0.1s
-          ↳ lineage 0 has become the dominant lineage (62% of population)
+      90    559     54     79     21     91     21     90  0.1s
+          ↳ lineage 10 has gone extinct
+          ↳ bottleneck recovery: lineage 6 has resurged from a critical population low
+          ↳ bottleneck recovery: lineage 7 has resurged from a critical population low
+     119    719     55     79     31    120     31    118  0.1s
+          ↳ lineage 8 has gone extinct
 ────────────────────────────────────────────────────────────────────────
-120 ticks  0.1s  872 t/s
+120 ticks  0.1s  1,078 t/s
 ```
 
 
+
+## Controls
+
+- **Click** anywhere in the ecosystem to manually drop an organism and some food.
+- **Space** to pause/resume the simulation.
+- **1-5** to adjust simulation speed (1x, 5x, 20x, 100x, MAX).
+- **R** to reset the simulation.
+- **S** to take a screenshot (saved to `screenshots/`).
 
 ## Observation Tools & Strategy Space
 
@@ -64,7 +84,8 @@ Because the organism *is* strictly its mathematical intent, the UI provides spec
 1. **Wight Inspector:** Hover your mouse over the ecosystem to lock onto a single living wight. The inspector tracks that organism's geographic coordinates over time, decodes its 15-channel brain into a real-time bar graph, and retains post-mortem diagnostics (`[DEAD]`) when its energy inevitably hits zero.
 2. **Weight Heatmaps:** Tracks the 10th to 90th percentile of the entire population's brain matrices. Unoptimized lineages render as static **Green** `[0.0]`. Over thousands of generations, survival pressure forces the global distributions to stretch into heavy **Blue** (inhibitory) and **Red** (excitatory) extremes.
 3. **Live Subject PCA:** A real-time Principal Component Analysis compresses the 15-dimensional strategy space into a 2-dimensional scatter plot so you can watch speciation in real time.
-4. **Emergence Log:** A scrolling real-time event ticker tags macro-evolutionary milestones as they occur—like population bottlenecks, metabolism breakthroughs, or biological immortality.
+4. **Lineage Tracking:** A stacked area chart logs the population balance of the 12 founding lineages over time, visualizing crashes, booms, and lineages diverging.
+5. **Emergence Log:** A scrolling real-time event ticker tags macro-evolutionary milestones as they occur—like population bottlenecks, metabolism breakthroughs, or biological immortality.
 
 When the matrix boots, the population initializes as a single noisy cloud. As natural selection filters the world tensor, you can watch the math tear itself apart into distinct, autonomous islands.
 
