@@ -405,11 +405,26 @@ def main():
     parser.add_argument("--headless", action="store_true", help="Run in terminal without UI")
     parser.add_argument("--ticks", type=int, default=None, help="Number of ticks to run (default: infinite)")
     parser.add_argument("--interval", type=int, default=500, help="Tick interval for logging in headless mode (default: 500)")
+    parser.add_argument("--seed", type=str, default=None, help="Alphanumeric seed for deterministic generation")
     args = parser.parse_args()
 
     is_headless = args.headless
     max_ticks = args.ticks
     interval = args.interval
+
+    import hashlib
+    import random
+    import string
+
+    seed_str = args.seed
+    if seed_str is None:
+        # Generate a fun readable 6-character random seed string
+        seed_str = "".join(random.choices(string.ascii_lowercase, k=6)).capitalize()
+
+    # Deterministically hash the string to a 32-bit int for numpy
+    seed_int = int(hashlib.sha256(seed_str.encode('utf-8')).hexdigest(), 16) % (2**32)
+    np.random.seed(seed_int)
+    print(f"\n[ wight-world | Seed: '{seed_str}' ]")
 
     if not is_headless:
         pygame.init()
@@ -688,8 +703,8 @@ def main():
         title_surf = font_lg.render("WIGHT-WORLD", True, (255, 255, 255))
         screen.blit(title_surf, (px + 10, stats_y))
 
-        tick_surf = font_sm.render(f"tick {tick_count:,}   [ANE]", True, (230, 230, 245))
-        screen.blit(tick_surf, (px + 10 + title_surf.get_width() + 15, stats_y + 4))
+        tick_surf = font_sm.render(f"s:{seed_str} t:{tick_count:,} [ANE]", True, (230, 230, 245))
+        screen.blit(tick_surf, (px + 10 + title_surf.get_width() + 6, stats_y + 4))
 
         stats_y += font_lg.get_height() + 2
         sep()
