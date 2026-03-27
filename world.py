@@ -17,6 +17,7 @@ except ImportError:
 # --- Configuration ---
 W_GRID, H_GRID = 64, 64
 RENDER_SCALE = 10
+LOG_WIDTH = 320
 W_PX, H_PX = W_GRID * RENDER_SCALE, H_GRID * RENDER_SCALE
 HUD_WIDTH = 380
 
@@ -284,7 +285,7 @@ def main():
 
     if not is_headless:
         pygame.init()
-        screen = pygame.display.set_mode((W_PX + HUD_WIDTH, H_PX), pygame.SCALED | pygame.RESIZABLE)
+        screen = pygame.display.set_mode((LOG_WIDTH + W_PX + HUD_WIDTH, H_PX), pygame.SCALED | pygame.RESIZABLE)
         pygame.display.set_caption("wight-world")
         
         # Load fonts
@@ -439,12 +440,13 @@ def main():
                     ui_events.clear()
                     lineage_history.clear()
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                gx = np.clip(event.pos[0] // RENDER_SCALE, 0, W_GRID - 1)
-                gy = np.clip(event.pos[1] // RENDER_SCALE, 0, H_GRID - 1)
-                # Drop an organism with random genes
-                drop_organism(world, gx, gy)
-                # Drop some large food nearby
-                world[0, 0, max(0,gy-2):min(H_GRID,gy+2), max(0,gx-2):min(W_GRID,gx+2)] += 1.0
+                if LOG_WIDTH <= event.pos[0] < LOG_WIDTH + W_PX:
+                    gx = np.clip((event.pos[0] - LOG_WIDTH) // RENDER_SCALE, 0, W_GRID - 1)
+                    gy = np.clip(event.pos[1] // RENDER_SCALE, 0, H_GRID - 1)
+                    # Drop an organism with random genes
+                    drop_organism(world, gx, gy)
+                    # Drop some large food nearby
+                    world[0, 0, max(0,gy-2):min(H_GRID,gy+2), max(0,gx-2):min(W_GRID,gx+2)] += 1.0
 
         if not paused:
             if speed_mode == 'MAX':
@@ -477,7 +479,11 @@ def main():
         rgba = np.transpose(rgba, (1, 0, 2))
         surf = pygame.surfarray.make_surface(rgba)
         surf_scaled = pygame.transform.scale(surf, (W_PX, H_PX))
-        screen.blit(surf_scaled, (0, 0))
+        # Clear the left dock
+        pygame.draw.rect(screen, (16, 16, 24), (0, 0, LOG_WIDTH, H_PX))
+        pygame.draw.line(screen, (50, 50, 80), (LOG_WIDTH - 1, 0), (LOG_WIDTH - 1, H_PX), 1)
+        # Blit main matrix
+        screen.blit(surf_scaled, (LOG_WIDTH, 0))
         
         # 2. Draw Organisms dynamically
         orgs = t[1]
@@ -503,7 +509,7 @@ def main():
             c = _LINEAGE_COLORS[lid]
             
             # Position & pulsating size based on energy
-            cx = x * RENDER_SCALE + RENDER_SCALE // 2
+            cx = LOG_WIDTH + x * RENDER_SCALE + RENDER_SCALE // 2
             cy = y * RENDER_SCALE + RENDER_SCALE // 2
             r = int((0.5 + energy * 0.5) * RENDER_SCALE * 0.9)
             
@@ -520,7 +526,7 @@ def main():
             lineage_history.append(dict(current_lineages))
             
         # 3. Draw Side HUD
-        px = W_PX
+        px = LOG_WIDTH + W_PX
         # Background track for HUD exactly like old code
         pygame.draw.rect(screen, (16, 16, 28), (px, 0, HUD_WIDTH, H_PX))
         pygame.draw.line(screen, (50, 50, 80), (px, 0), (px, H_PX), 1)
@@ -607,7 +613,7 @@ def main():
 
                 ui_prev['pop'] = pop
                 ui_prev['d_avg'] = avg_drain
-                ui_events = ui_events[-6:] # Keep last 6
+                ui_events = ui_events[-20:] # Keep last 20
             
             trow(["", "MIN", "AVG", "MAX", "STD"], font_sm, (170, 180, 210))
             trow(["Energy", min_energy, avg_energy, max_energy, std_energy], font_sm, (230, 230, 245))
@@ -790,24 +796,18 @@ def main():
             screen.blit(surf, (c_x, footer_y))
             c_x += surf.get_width() + 8
         
-        # Event History Transparency Window
-        if ui_events:
-            ev_w = 380
-            ev_h = 40 + len(ui_events) * (font_sm.get_height() + 2)
-            s = pygame.Surface((ev_w, ev_h), pygame.SRCALPHA)
-            s.fill((16, 16, 24, 210)) # Semi-transparent dark
-            pygame.draw.rect(s, (40, 40, 60, 255), s.get_rect(), 1)
-            
-            box_x = 10
-            box_y = H_PX - ev_h - 10
-            screen.blit(s, (box_x, box_y))
-            
-            screen.blit(font.render("LIVE EVENTS", True, (255, 210, 120)), (box_x + 10, box_y + 8))
-            e_y = box_y + 25 + font.get_height() // 2
-            line_spacing = font_sm.get_height() + 2
-            for ev in ui_events:
-                screen.blit(font_sm.render(ev, True, (220, 230, 250)), (box_x + 10, e_y))
-                e_y += line_spacing
+        # 4. Left Dock - Live Events
+        box_x = 10
+        box_y = 10
+        screen.blit(font.render("LIVE EVENTS", True, (255, 210, 120)), (box_x, box_y))
+        
+        e_y = box_y + 25
+        line_spacing = font_sm.get_height() + 8
+        for ev in ui_events:
+            # We can split the string by spaces to wrap it slightly if needed, 
+            # but LOG_WIDTH=250 should be enough for "longevity unlocked..."
+            screen.blit(font_sm.render(ev, True, (220, 230, 250)), (box_x, e_y))
+            e_y += line_spacing
 
         pygame.display.flip()
         
