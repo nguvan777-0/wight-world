@@ -1170,31 +1170,66 @@ def main():
             ay = py + int(np.sin(w_val[0] * np.pi) * 30 * 1.0)
             pygame.draw.line(screen, (255, 255, 255), (pw, py), (ax, ay), 2)
 
-            # Stats (Show DEAD tag if deceased)
+            # Stats Grid (Show DEAD tag if deceased)
             spec_str = f"Lineage {lid}"
+            stat_color = (220, 230, 250)
             if wight.get('status') == 'DEAD':
                 spec_str += " [DEAD]"
-                c = (200, 80, 80)
+                c = (255, 80, 80)
+                stat_color = (150, 150, 160)
+                # Draw a cross over the portrait if dead
+                pygame.draw.line(screen, (255, 50, 50), (pw-20, py-20), (pw+20, py+20), 3)
+                pygame.draw.line(screen, (255, 50, 50), (pw-20, py+20), (pw+20, py-20), 3)
 
-            tx = 85
-            screen.blit(font_sm.render(spec_str, True, c), (tx, insp_y + 10))
-            screen.blit(font_sm.render(f"Nrg: {wight['e']:.2f}", True, (220, 230, 250)), (tx, insp_y + 25))
-            screen.blit(font_sm.render(f"Age: {int(wight['a'])}", True, (220, 230, 250)), (tx, insp_y + 40))
-            screen.blit(font_sm.render(f"Met: {wight['d']:.2f}", True, (220, 230, 250)), (tx, insp_y + 55))
+            tx1, tx2 = 85, 175
+            screen.blit(font.render(spec_str, True, c), (tx1, insp_y + 10))
 
-            # Brain Graph (15 values)
-            w_y = insp_y + 80
-            for i, name in enumerate(WEIGHT_NAMES):
-                val = w_val[i]
-                percent = (val + 8) / 16.0
-                tw = int(percent * 70)
-                tw = max(0, min(70, tw))
-                screen.blit(font_sm.render(f"{name}", True, (200, 200, 220)), (5, w_y))
-                bar_color = get_lerp_color(percent)
-                pygame.draw.rect(screen, bar_color, (80, w_y + 2, tw, 8))
-                val_surf = font_sm.render(f"{val:>5.1f}", True, (200, 200, 220))
-                screen.blit(val_surf, (LOG_WIDTH - val_surf.get_width() - 6, w_y))
-                w_y += 15
+            # Column 1
+            screen.blit(font_sm.render(f"Pos: ({wight['x']}, {wight['y']})", True, stat_color), (tx1, insp_y + 30))
+            screen.blit(font_sm.render(f"Age: {int(wight['a'])}", True, stat_color), (tx1, insp_y + 45))
+            # Column 2
+            screen.blit(font_sm.render(f"Nrg: {wight['e']:.2f}", True, stat_color), (tx2, insp_y + 30))
+            screen.blit(font_sm.render(f"Met: {wight['d']:.2f}", True, stat_color), (tx2, insp_y + 45))
+
+            # Brain Bar Graph - Matrix Layout (Food, Scent, Nrg across N,S,E,W,Stay)
+            # Headers
+            w_y = insp_y + 75
+            head_c = (150, 150, 180)
+            screen.blit(font_sm.render("Food", True, head_c), (55, w_y))
+            screen.blit(font_sm.render("Scent", True, head_c), (105, w_y))
+            screen.blit(font_sm.render("Nrg", True, head_c), (155, w_y))
+
+            dirs = ["Stay", "N", "S", "E", "W"]
+            for row_idx, d_name in enumerate(dirs):
+                r_y = w_y + 20 + (row_idx * 16)
+                screen.blit(font_sm.render(f"{d_name:>4}:", True, (200, 200, 220)), (10, r_y))
+
+                # Each direction has 3 components (Food, Scent, nrg)
+                for col_idx in range(3):
+                    w_idx = row_idx * 3 + col_idx
+                    val = w_val[w_idx]
+                    percent = (val + 8) / 16.0
+
+                    bar_w = int(percent * 35)
+                    bar_w = max(0, min(35, bar_w))
+                    bx = 55 + (col_idx * 50)
+
+                    bg_rect = (bx, r_y + 2, 35, 8)
+                    pygame.draw.rect(screen, (40, 40, 50), bg_rect) # background groove
+
+                    bar_color = get_lerp_color(percent)
+                    pygame.draw.rect(screen, bar_color, (bx, r_y + 2, bar_w, 8))
+
+                    # Optional: tiny value overlay
+                    # tiny_v = int(val)
+                    # screen.blit(font_sm.render(f"{tiny_v}", True, (255,255,255)), (bx+2, r_y-1))
+
+            # Draw an evaluation sparkline or extra context if alive
+            if wight.get('status') != 'DEAD':
+                fav_dir_idx = int(np.argmax([np.sum(w_val[i*3:(i+1)*3]) for i in range(5)]))
+                fav_dir = dirs[fav_dir_idx]
+                eval_str = f"Intent: {fav_dir}"
+                screen.blit(font_sm.render(eval_str, True, (120, 255, 120)), (10, r_y + 25))
         else:
             screen.blit(font_sm.render("Hover over matrix to inspect.", True, (120, 120, 130)), (10, insp_y + 25))
 
