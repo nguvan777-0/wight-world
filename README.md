@@ -2,6 +2,8 @@
 
 wight-world is a neuroevolution engine that executes natural selection purely through image filters. Instead of modeling discrete virtual bodies, the organism here is a *wight*—a single living pixel made entirely of floating-point logic. The wight is exactly its weights.
 
+![Screenshot](https://github.com/nguvan777-0/wight-world/releases/download/screenshots/wight-world_KIlulh_157.png)
+
 > *Life thrives at the boundary of states. Inject an energy gradient into a static tensor, and the math will organize to transform it.*
 
 This project abandons object-oriented loops in favor of **hardware-native natural selection**. The entire ecosystem is a single contiguous tensor where the laws of physics and biology are reduced to simultaneous 2D convolutions.
