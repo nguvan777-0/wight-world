@@ -418,8 +418,8 @@ def main():
     
     seed_str = args.seed
     if seed_str is None:
-        # Generate a fun readable 6-character random seed string
-        seed_str = "".join(random.choices(string.ascii_lowercase, k=6)).capitalize()
+        # Generate a fun readable 6-character random seed string with mixed case
+        seed_str = "".join(random.choices(string.ascii_letters, k=6))
         
     # Deterministically hash the string to a 32-bit int for numpy
     seed_int = int(hashlib.sha256(seed_str.encode('utf-8')).hexdigest(), 16) % (2**32)
@@ -540,8 +540,12 @@ def main():
     last_inspected_wight = None
     
     last_event_tick = 0
+    flash_r = 0
+    flash_s = 0
     
     while running:
+        if flash_r > 0: flash_r -= 1
+        if flash_s > 0: flash_s -= 1
         for event in pygame.event.get():
             if event.type == pygame.QUIT: running = False
             elif event.type == pygame.KEYDOWN:
@@ -563,6 +567,7 @@ def main():
                     speed_mode = 'MAX'
                     paused = False
                 elif event.key == pygame.K_r or getattr(event, 'unicode', '').lower() == 'r':
+                    flash_r = 15
                     world = init_world()
                     for i in range(12):
                         drop_organism(world, np.random.randint(W_GRID), np.random.randint(H_GRID), lineage_id=i)
@@ -574,6 +579,13 @@ def main():
                     ui_events_scroll = 0
                     lineage_history.clear()
                     last_inspected_wight = None
+                elif event.key == pygame.K_s or getattr(event, 'unicode', '').lower() == 's':
+                    flash_s = 15
+                    import os
+                    os.makedirs("screenshots", exist_ok=True)
+                    filename = f"screenshots/wight-world_{seed_str}_{tick_count}.png"
+                    pygame.image.save(screen, filename)
+                    print(f"Saved screenshot: {filename}")
             elif event.type == pygame.MOUSEWHEEL:
                 mx, my = pygame.mouse.get_pos()
                 if mx < LOG_WIDTH and my < H_PX - 320: # Scrolling in the Live Events area
@@ -705,9 +717,28 @@ def main():
         title_surf = font_lg.render("WIGHT-WORLD", True, (255, 255, 255))
         screen.blit(title_surf, (px + 10, stats_y))
         
-        # Stats moved to Title row
-        tick_surf = font_sm.render(f"s:{seed_str} t:{tick_count:,} [ANE]", True, (230, 230, 245))
-        screen.blit(tick_surf, (px + 10 + title_surf.get_width() + 6, stats_y + 4))
+        # Stats moved to Title row - Distributed with Spacers
+        seed_surf = font_sm.render(f"s:{seed_str}", True, (230, 230, 245))
+        tick_surf = font_sm.render(f"t:{tick_count:,}", True, (230, 230, 245))
+        ane_surf  = font_sm.render("[ANE]", True, (230, 230, 245))
+        
+        total_w = seed_surf.get_width() + tick_surf.get_width() + ane_surf.get_width()
+        avail_space = HUD_WIDTH - 20 - title_surf.get_width()
+        
+        # 3 gaps (between Title-S, S-T, and T-ANE)
+        gap = max(6, (avail_space - total_w) // 3)
+        
+        # Vertically center with title using heights
+        y_pos = stats_y + max(0, (title_surf.get_height() - font_sm.get_height()) // 2)
+        
+        cx = px + 10 + title_surf.get_width() + gap
+        screen.blit(seed_surf, (cx, y_pos))
+        
+        cx += seed_surf.get_width() + gap
+        screen.blit(tick_surf, (cx, y_pos))
+        
+        cx += tick_surf.get_width() + gap
+        screen.blit(ane_surf, (cx, y_pos))
         
         stats_y += font_lg.get_height() + 2
         sep()
@@ -905,17 +936,18 @@ def main():
         
         c_x = px + 10
         controls = [
-            ("SPC:pause", paused),
-            ("R:reset", False),
-            ("1:1x", not paused and speed_mode == 1),
-            ("2:5x", not paused and speed_mode == 5),
-            ("3:20x", not paused and speed_mode == 20),
-            ("4:100x", not paused and speed_mode == 100),
-            ("5:MAX", not paused and speed_mode == 'MAX')
+            (f"SPC:{'▶ ' if paused else '▌▌'}", paused, (255, 100, 100)), # Red
+            ("R:↻", flash_r > 0, (255, 165, 0)), # Orange
+            ("S:img", flash_s > 0, (255, 255, 0)), # Yellow
+            ("1:1x", not paused and speed_mode == 1, (100, 255, 100)), # Green
+            ("2:5x", not paused and speed_mode == 5, (100, 255, 255)), # Cyan
+            ("3:20x", not paused and speed_mode == 20, (100, 150, 255)), # Blue
+            ("4:100x", not paused and speed_mode == 100, (180, 100, 255)), # Purple
+            ("5:MAX", not paused and speed_mode == 'MAX', (255, 100, 255)) # Pink
         ]
         
-        for text, is_active in controls:
-            color = (255, 100, 100) if (is_active and "SPC" in text) else (255, 255, 255) if is_active else (120, 120, 130)
+        for text, is_active, active_color in controls:
+            color = active_color if is_active else (120, 120, 130)
             surf = font_sm.render(text, True, color)
             screen.blit(surf, (c_x, footer_y))
             c_x += surf.get_width() + 8
