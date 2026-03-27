@@ -52,12 +52,14 @@ Running simulation headless for 1200 ticks...
 
 
 
-## Speciation & Strategy Space
+## Observation Tools & Strategy Space
 
-Because the organism *is* strictly its mathematical intent, the HUD allows you to watch the population's weights diverge and speciate in real-time.
+Because the organism *is* strictly its mathematical intent, the UI provides specialized telemetry to observe populations at both the macro and absolute micro scale:
 
-1. **Weight Heatmaps:** Tracks the 10th to 90th percentile of the population's brain matrices. Unoptimized wights render as static **Green** `[0.0]`. Over thousands of generations, survival pressure forces the distributions to stretch into heavy **Blue** (inhibitory) and **Red** (excitatory) extremes.
-2. **Live Subject PCA:** A real-time Principal Component Analysis (computed via fast SVD) compresses the 15-channel brains into a 2D scatter plot.
+1. **Wight Inspector:** Hover your mouse over the ecosystem to lock onto a single living wight. The inspector tracks that organism's geographic coordinates over time, decodes its 15-channel brain into a real-time bar graph, and retains post-mortem diagnostics (`[DEAD]`) when its energy inevitably hits zero.
+2. **Weight Heatmaps:** Tracks the 10th to 90th percentile of the entire population's brain matrices. Unoptimized species render as static **Green** `[0.0]`. Over thousands of generations, survival pressure forces the global distributions to stretch into heavy **Blue** (inhibitory) and **Red** (excitatory) extremes.
+3. **Live Subject PCA:** A real-time Principal Component Analysis compresses the 15-dimensional strategy space into a 2-dimensional scatter plot so you can watch speciation in real time.
+4. **Emergence Log:** A scrolling real-time event ticker tags macro-evolutionary milestones as they occur—like population bottlenecks, metabolism breakthroughs, or biological immortality.
 
 When the matrix boots, the population initializes as a single noisy cloud. As natural selection filters the world tensor, you can watch the math tear itself apart into distinct, autonomous islands.
 
@@ -65,9 +67,9 @@ These clusters represent ecological niches forming within the latent space—suc
 
 ## Layout
 
-Because the physics, biology, and environment are just layers of the same tensor, the entire engine is beautifully compressed down to a single Python script:
+Because the physics, biology, and environment—and all of their emergent behaviors—are just layers of the same tensor, the entire engine is implemented as a single Python script:
 
-`world.py` — The unified Core ML graph, tensor setup, runtime, and emergent Pygame renderer.
+`world.py` — The unified Core ML graph, tensor setup, runtime, and Pygame renderer.
 
 ## License
 

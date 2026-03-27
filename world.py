@@ -17,9 +17,9 @@ except ImportError:
 # --- Configuration ---
 W_GRID, H_GRID = 64, 64
 RENDER_SCALE = 10
-LOG_WIDTH = 320
+LOG_WIDTH = 260
 W_PX, H_PX = W_GRID * RENDER_SCALE, H_GRID * RENDER_SCALE
-HUD_WIDTH = 380
+HUD_WIDTH = 340
 
 CH_FOOD = 1
 CH_ENERGY = 1
@@ -30,6 +30,22 @@ CH_ORG = CH_ENERGY + CH_AGE + CH_ENERGY_DRAIN + CH_WEIGHTS
 CH_TOTAL = CH_FOOD + CH_ORG
 
 MODEL_PATH = "build/ane_wight_world.mlpackage"
+
+WEIGHT_NAMES = [
+    "Stay:Food", "Stay:Scent", "Stay:nrg",
+    "N:Food", "N:Scent", "N:nrg",
+    "S:Food", "S:Scent", "S:nrg",
+    "E:Food", "E:Scent", "E:nrg",
+    "W:Food", "W:Scent", "W:nrg"
+]
+
+def get_lerp_color(t_val, lo=(60, 100, 200), mid=(60, 200, 120), hi=(220, 80, 60)):
+    t_val = max(0.0, min(1.0, t_val))
+    if t_val < 0.5:
+        s = t_val * 2
+        return tuple(int(lo[j] + (mid[j] - lo[j]) * s) for j in range(3))
+    s = (t_val - 0.5) * 2
+    return tuple(int(mid[j] + (hi[j] - mid[j]) * s) for j in range(3))
 
 # --- Directional Kernels for Discrete Shifting ---
 # We represent 5 discrete choices: 0:Stay, 1:North, 2:South, 3:East, 4:West
@@ -404,6 +420,8 @@ def main():
     ui_prev = {'pop': None, 'd_avg': None}
     ui_flags = set()
     ui_events = []
+    ui_events_scroll = 0
+    last_inspected_wight = None
 
     last_event_tick = 0
 
@@ -437,7 +455,14 @@ def main():
                     ui_prev = {'pop': None, 'd_avg': None}
                     ui_flags.clear()
                     ui_events.clear()
+                    ui_events_scroll = 0
                     lineage_history.clear()
+                    last_inspected_wight = None
+            elif event.type == pygame.MOUSEWHEEL:
+                mx, my = pygame.mouse.get_pos()
+                if mx < LOG_WIDTH and my < H_PX - 320: # Scrolling in the Live Events area
+                    ui_events_scroll += event.y
+                    # Will clamp scroll bounds during rendering
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if LOG_WIDTH <= event.pos[0] < LOG_WIDTH + W_PX:
                     gx = np.clip((event.pos[0] - LOG_WIDTH) // RENDER_SCALE, 0, W_GRID - 1)
@@ -446,6 +471,13 @@ def main():
                     drop_organism(world, gx, gy)
                     # Drop some large food nearby
                     world[0, 0, max(0,gy-2):min(H_GRID,gy+2), max(0,gx-2):min(W_GRID,gx+2)] += 1.0
+
+        # Hover tracking for Wight Inspector
+        mx, my = pygame.mouse.get_pos()
+        hover_gx, hover_gy = None, None
+        if LOG_WIDTH <= mx < LOG_WIDTH + W_PX and 0 <= my < H_PX:
+            hover_gx = np.clip((mx - LOG_WIDTH) // RENDER_SCALE, 0, W_GRID - 1)
+            hover_gy = np.clip(my // RENDER_SCALE, 0, H_GRID - 1)
 
         if not paused:
             if speed_mode == 'MAX':
@@ -582,7 +614,7 @@ def main():
 
             biomass = int(orgs[y_idx, x_idx].sum() * 100)
 
-            txt(f"POPULATION {pop:,}   BIOMASS {biomass:,}   FOOD {total_food:,}", font_sm, (200, 255, 200))
+            txt(f"POP: {pop:,}      BIO: {biomass:,}      FOOD: {total_food:,}", font_sm, (200, 255, 200))
             stats_y += 4
 
             # Event Tracking
@@ -610,7 +642,7 @@ def main():
 
                 ui_prev['pop'] = pop
                 ui_prev['d_avg'] = avg_drain
-                ui_events = ui_events[-20:] # Keep last 20
+                ui_events = ui_events[-200:] # Keep last 200 in raw history
 
             trow(["", "MIN", "AVG", "MAX", "STD"], font_sm, (170, 180, 210))
             trow(["Energy", min_energy, avg_energy, max_energy, std_energy], font_sm, (230, 230, 245))
@@ -623,7 +655,7 @@ def main():
 
         # LINEAGES Over Time (Rainbow Stacked Area Chart)
         txt("LINEAGES over time", font, (255, 210, 120))
-        rx, ry, rw, rh = px + 8, stats_y, 350, 95
+        rx, ry, rw, rh = px + 8, stats_y, HUD_WIDTH - 16, 95
 
         pygame.draw.rect(screen, (20, 20, 25), (rx, ry, rw, rh))
         if len(lineage_history) > 1:
@@ -714,30 +746,15 @@ def main():
             else:
                 p10 = med = p90 = W_pop[0]
 
-            weight_names = [
-                "Stay:Food", "Stay:Scent", "Stay:nrg",
-                "N:Food", "N:Scent", "N:nrg",
-                "S:Food", "S:Scent", "S:nrg",
-                "E:Food", "E:Scent", "E:nrg",
-                "W:Food", "W:Scent", "W:nrg"
-            ]
-
             # Map values from [-8, 8] to pixel width
             v_min, v_max = -8.0, 8.0
-
-            def _lerp_color(t_val, lo=(60, 100, 200), mid=(60, 200, 120), hi=(220, 80, 60)):
-                if t_val < 0.5:
-                    s = t_val * 2
-                    return tuple(int(lo[j] + (mid[j] - lo[j]) * s) for j in range(3))
-                s = (t_val - 0.5) * 2
-                return tuple(int(mid[j] + (hi[j] - mid[j]) * s) for j in range(3))
 
             # Compute row height based on remaining space
             available_h = H_PX - stats_y - 25
             row_interval = max(11.0, available_h / 15.0)
             row_h = int(row_interval) - 1 # Leaves 1px pad between rows
 
-            for i, name in enumerate(weight_names):
+            for i, name in enumerate(WEIGHT_NAMES):
                 y_baseline = stats_y + int(i * row_interval)
 
                 # Text
@@ -760,7 +777,7 @@ def main():
                 x10, xmed, x90 = sx(p10[i]), sx(med[i]), sx(p90[i])
 
                 n_med_norm = np.clip((med[i] - v_min) / (v_max - v_min), 0, 1)
-                color = _lerp_color(n_med_norm)
+                color = get_lerp_color(n_med_norm)
                 dim = tuple(c // 4 for c in color)
 
                 # Background p10-p90 band (dim rainbow tinted)
@@ -794,17 +811,141 @@ def main():
             c_x += surf.get_width() + 8
 
         # 4. Left Dock - Live Events
+        # Clip to prevent event ticker text from bleeding into the matrix
+        screen.set_clip(pygame.Rect(0, 0, LOG_WIDTH - 2, H_PX))
+
         box_x = 10
         box_y = 10
         screen.blit(font.render("LIVE EVENTS", True, (255, 210, 120)), (box_x, box_y))
 
-        e_y = box_y + 25
-        line_spacing = font_sm.get_height() + 8
+        # Word Wrap Logic
+        wrapped_lines = []
+        max_width = LOG_WIDTH - 20
         for ev in ui_events:
-            # We can split the string by spaces to wrap it slightly if needed,
-            # but LOG_WIDTH=250 should be enough for "longevity unlocked..."
-            screen.blit(font_sm.render(ev, True, (220, 230, 250)), (box_x, e_y))
+            words = ev.split(' ')
+            current_line = []
+            for word in words:
+                current_line.append(word)
+                if font_sm.size(' '.join(current_line))[0] > max_width:
+                    current_line.pop()
+                    if current_line:
+                        wrapped_lines.append(' '.join(current_line))
+                    current_line = [word]
+            if current_line:
+                wrapped_lines.append(' '.join(current_line))
+
+        line_spacing = font_sm.get_height() + 4
+        # Calculate max lines that fit above the inspector panel
+        max_lines_fit = (H_PX - 320 - box_y - 25) // line_spacing
+
+        max_scroll = max(0, len(wrapped_lines) - max_lines_fit)
+        ui_events_scroll = max(0, min(max_scroll, ui_events_scroll))
+
+        # ui_events_scroll > 0 means scrolled UP to see older history
+        start_idx = max_scroll - ui_events_scroll
+
+        e_y = box_y + 25
+        visible_lines = wrapped_lines[start_idx:start_idx + max_lines_fit]
+        for line in visible_lines:
+            screen.blit(font_sm.render(line, True, (220, 230, 250)), (box_x, e_y))
             e_y += line_spacing
+
+        # Wight Inspector
+        insp_y = H_PX - 320
+        pygame.draw.line(screen, (50, 50, 80), (10, insp_y - 15), (LOG_WIDTH - 10, insp_y - 15), 1)
+        screen.blit(font.render("WIGHT INSPECTOR", True, (255, 210, 120)), (10, insp_y))
+
+        # Remove clip explicitly before Matrix/Tracking logic that draws into main screen
+        screen.set_clip(None)
+
+        is_hovering_live_cell = False
+        if hover_gx is not None and hover_gy is not None:
+            # Highlight hovered cell in matrix
+            pygame.draw.rect(screen, (255, 255, 255), (LOG_WIDTH + hover_gx * RENDER_SCALE, hover_gy * RENDER_SCALE, RENDER_SCALE, RENDER_SCALE), 1)
+
+            # If hovered over a valid organism, snapshot it
+            e_val = orgs[hover_gy, hover_gx]
+            if e_val > 0.0:
+                is_hovering_live_cell = True
+                last_inspected_wight = {
+                    'x': int(hover_gx),
+                    'y': int(hover_gy),
+                    'e': float(e_val),
+                    'a': float(ages[hover_gy, hover_gx]),
+                    'd': float(drains[hover_gy, hover_gx]),
+                    'w': weights[:, hover_gy, hover_gx].copy(),
+                    'status': 'alive'
+                }
+
+        # Track the previously inspected wight if we aren't hovering a new one
+        if not is_hovering_live_cell and last_inspected_wight is not None:
+            diff = weights - last_inspected_wight['w'][:, None, None]
+            dist = np.sum(diff**2, axis=0) # shape (H_GRID, W_GRID)
+            # Only consider living cells
+            dist[orgs == 0] = float('inf')
+
+            min_dist = np.min(dist)
+            # Threshold ensures we track the exact parent, not a mutated child
+            if min_dist < 0.1:
+                min_idx = np.argmin(dist)
+                ny, nx = np.unravel_index(min_idx, dist.shape)
+                last_inspected_wight = {
+                    'x': int(nx),
+                    'y': int(ny),
+                    'e': float(orgs[ny, nx]),
+                    'a': float(ages[ny, nx]),
+                    'd': float(drains[ny, nx]),
+                    'w': weights[:, ny, nx].copy(),
+                    'status': 'alive'
+                }
+            else:
+                last_inspected_wight['status'] = 'DEAD' # The tracked wight died
+
+        if last_inspected_wight is not None:
+            wight = last_inspected_wight
+
+            # Draw tracking crosshair on the matrix
+            if wight.get('status') != 'DEAD':
+                pygame.draw.rect(screen, (255, 100, 100), (LOG_WIDTH + wight['x'] * RENDER_SCALE, wight['y'] * RENDER_SCALE, RENDER_SCALE, RENDER_SCALE), 2)
+
+            w_val = wight['w']
+            lid = int(np.argmax(w_val[:12]))
+            c = _LINEAGE_COLORS[lid]
+
+            # Big portrait
+            pw, py = 65, insp_y + 45
+            pygame.draw.circle(screen, c, (pw, py), 30)
+            pygame.draw.circle(screen, (255, 255, 255), (pw, py), 30, 2)
+            ax = pw + int(np.cos(w_val[0] * np.pi) * 30 * 1.0)
+            ay = py + int(np.sin(w_val[0] * np.pi) * 30 * 1.0)
+            pygame.draw.line(screen, (255, 255, 255), (pw, py), (ax, ay), 2)
+
+            # Stats (Show DEAD tag if deceased)
+            spec_str = f"Species {lid}"
+            if wight.get('status') == 'DEAD':
+                spec_str += " [DEAD]"
+                c = (200, 80, 80)
+
+            tx = 100
+            screen.blit(font_sm.render(spec_str, True, c), (tx, insp_y + 15))
+            screen.blit(font_sm.render(f"Energy: {wight['e']:.2f}", True, (220, 230, 250)), (tx, insp_y + 35))
+            screen.blit(font_sm.render(f"Age: {int(wight['a'])}", True, (220, 230, 250)), (tx, insp_y + 55))
+            screen.blit(font_sm.render(f"Met: {wight['d']:.2f}", True, (220, 230, 250)), (tx + 70, insp_y + 55))
+
+            # Brain Graph (15 values)
+            w_y = insp_y + 85
+            for i, name in enumerate(WEIGHT_NAMES):
+                val = w_val[i]
+                percent = (val + 8) / 16.0
+                tw = int(percent * 100)
+                tw = max(0, min(100, tw))
+                screen.blit(font_sm.render(f"{name}", True, (200, 200, 220)), (5, w_y))
+                bar_color = get_lerp_color(percent)
+                pygame.draw.rect(screen, bar_color, (75, w_y + 2, tw, 8))
+                screen.blit(font_sm.render(f"{val:>5.1f}", True, (200, 200, 220)), (180, w_y))
+                w_y += 15
+        else:
+            screen.blit(font_sm.render("Hover over matrix to inspect.", True, (120, 120, 130)), (10, insp_y + 25))
 
         pygame.display.flip()
 
