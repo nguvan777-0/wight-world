@@ -398,6 +398,51 @@ def evaluate_milestones(pop, avg_age, max_age, avg_drain, max_weight_abs, total_
     prev_state['lineages'] = dict(lineage_counts)
 
     return events
+def _save_worker(filepath, world_copy, tick, seed_str, rng_copy, ui_prev_copy, ui_events_copy, history_copy, flags_copy):
+    import os
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    np.savez_compressed(
+        filepath,
+        world=world_copy,
+        tick=np.array([tick]),
+        seed=np.array([seed_str]),
+        rng_state=np.array(rng_copy, dtype=object),
+        ui_prev=np.array([ui_prev_copy], dtype=object),
+        ui_events=np.array(ui_events_copy, dtype=object),
+        lineage_history=np.array(history_copy, dtype=object),
+        ui_flags=np.array(list(flags_copy), dtype=object)
+    )
+    print(f"Background save committed to {filepath}")
+
+def save_state(filepath, world, tick, seed_str, rng_state, ui_prev, ui_events, lineage_history, ui_flags):
+    import threading
+    import copy
+    world_copy = world.copy()
+    rng_copy = copy.deepcopy(rng_state)
+    ui_prev_copy = copy.deepcopy(ui_prev)
+    ui_events_copy = list(ui_events)
+    history_copy = list(lineage_history)
+    flags_copy = set(ui_flags)
+
+    t = threading.Thread(target=_save_worker, args=(
+        filepath, world_copy, tick, seed_str, rng_copy, ui_prev_copy, ui_events_copy, history_copy, flags_copy
+    ))
+    t.start()
+
+def load_state(filepath):
+    data = np.load(filepath, allow_pickle=True)
+    world = data['world']
+    tick = int(data['tick'][0])
+    seed_str = str(data['seed'][0])
+    np.random.set_state(tuple(data['rng_state']))
+    ui_prev = data['ui_prev'][0]
+    ui_events = list(data['ui_events'])
+
+    import collections
+    lineage_history = collections.deque(list(data['lineage_history']), maxlen=280)
+    ui_flags = set(data['ui_flags'])
+
+    return world, tick, seed_str, ui_prev, ui_events, lineage_history, ui_flags
 
 
 def main():
@@ -406,6 +451,7 @@ def main():
     parser.add_argument("--ticks", type=int, default=None, help="Number of ticks to run (default: infinite)")
     parser.add_argument("--interval", type=int, default=500, help="Tick interval for logging in headless mode (default: 500)")
     parser.add_argument("--seed", type=str, default=None, help="Alphanumeric seed for deterministic generation")
+    parser.add_argument("--load", type=str, default=None, help="Path to .npz file to load state from")
     args = parser.parse_args()
 
     is_headless = args.headless
@@ -416,15 +462,26 @@ def main():
     import random
     import string
 
-    seed_str = args.seed
-    if seed_str is None:
-        # Generate a fun readable 6-character random seed string with mixed case
-        seed_str = "".join(random.choices(string.ascii_letters, k=6))
+    if args.load is not None:
+        world, start_tick, seed_str, state_prev, state_events, state_history, state_flags = load_state(args.load)
+        print(f"\n[ wight-world | Resuming State: {args.load} | Seed: '{seed_str}' ]")
+        import collections
+    else:
+        seed_str = args.seed
+        if seed_str is None:
+            # Generate a fun readable 6-character random seed string with mixed case
+            seed_str = "".join(random.choices(string.ascii_letters, k=6))
 
-    # Deterministically hash the string to a 32-bit int for numpy
-    seed_int = int(hashlib.sha256(seed_str.encode('utf-8')).hexdigest(), 16) % (2**32)
-    np.random.seed(seed_int)
-    print(f"\n[ wight-world | Seed: '{seed_str}' ]")
+        # Deterministically hash the string to a 32-bit int for numpy
+        seed_int = int(hashlib.sha256(seed_str.encode('utf-8')).hexdigest(), 16) % (2**32)
+        np.random.seed(seed_int)
+        print(f"\n[ wight-world | Seed: '{seed_str}' ]")
+        start_tick = 0
+        state_prev = {'pop': None, 'd_avg': None}
+        state_flags = set([f"est_{i}" for i in range(12)])
+        state_events = []
+        import collections
+        state_history = collections.deque(maxlen=280)
 
     if not is_headless:
         pygame.init()
@@ -446,9 +503,6 @@ def main():
         clock = pygame.time.Clock()
 
         # UI State
-        import collections
-        lineage_history = collections.deque(maxlen=280)
-
         _LINEAGE_COLORS = [
             (255,   0,   0), (255, 128,   0), (255, 255,   0), (128, 255,   0), # Red, Orange, Yellow, Chartreuse
             (  0, 255,   0), (  0, 255, 128), (  0, 255, 255), (  0, 128, 255), # Green, Spring Green, Cyan, Sky Blue
@@ -456,11 +510,12 @@ def main():
         ]
 
     model = get_model()
-    world = init_world()
 
-    # Spawn 12 starting founders, seeding the 12 rainbow lineages
-    for i in range(12):
-        drop_organism(world, np.random.randint(W_GRID), np.random.randint(H_GRID), lineage_id=i)
+    if args.load is None:
+        world = init_world()
+        # Spawn 12 starting founders, seeding the 12 rainbow lineages
+        for i in range(12):
+            drop_organism(world, np.random.randint(W_GRID), np.random.randint(H_GRID), lineage_id=i)
 
     if is_headless:
         duration_str = f"{max_ticks:,} ticks" if max_ticks else "forever"
@@ -470,12 +525,13 @@ def main():
         print("─" * 72)
         t0 = time.time()
 
-        _prev = {'pop': None, 'd_avg': None}
-        _flags = set([f"est_{i}" for i in range(12)])
+        _prev = state_prev
+        _flags = state_flags
 
-        i = 0
+        i = start_tick
+        target_tick = start_tick + max_ticks if max_ticks else None
         try:
-            while max_ticks is None or i < max_ticks:
+            while target_tick is None or i < target_tick:
                 mutation = (np.random.randn(1, CH_WEIGHTS, H_GRID, W_GRID) * 0.1).astype(np.float32)
                 out = model.predict({"world": world, "mutation": mutation})
                 world = list(out.values())[0]
@@ -483,7 +539,7 @@ def main():
                 world[0, 0] += np.random.rand(H_GRID, W_GRID) * 0.02
                 world[0, 0] = np.clip(world[0,0], 0.0, 1.0)
 
-                if i % interval == 0 or (max_ticks and i == max_ticks - 1):
+                if i % interval == 0 or (target_tick and i == target_tick - 1):
                     orgs = world[0, 1]
                     ages = world[0, 2]
                     drains = world[0, 3]
@@ -513,6 +569,11 @@ def main():
                         print(f"{i:8d}      EXTINCT")
                         break
 
+                # Headless runs at maximum computational speed, so a 5,000 tick interval is roughly ~2-4 seconds.
+                if i > 0 and i % 5000 == 0:
+                    import collections
+                    save_state(f"saves/wight-world_{seed_str}.npz", world, i, seed_str, np.random.get_state(), _prev, [], collections.deque(), _flags)
+
                 i += 1
         except KeyboardInterrupt:
             print("\nHeadless run interrupted by user.")
@@ -524,7 +585,7 @@ def main():
         return
 
     running = True
-    tick_count = 0
+    tick_count = start_tick
     paused = False
     speed_mode = 1
     print("\nSimulation Started!")
@@ -532,13 +593,15 @@ def main():
     print(" - SPACE pauses/resumes.")
     print(" - Keys 1-5 adjust speed (1x, 5x, 20x, 100x, MAX).")
 
-    ui_prev = {'pop': None, 'd_avg': None}
-    ui_flags = set([f"est_{i}" for i in range(12)])
-    ui_events = []
+    ui_prev = state_prev
+    ui_flags = state_flags
+    ui_events = state_events
+    lineage_history = state_history
     ui_events_scroll = 0
     last_inspected_wight = None
 
-    last_event_tick = 0
+    last_event_tick = tick_count
+    last_autosave_tick = start_tick
     flash_r = 0
     flash_s = 0
 
@@ -625,6 +688,16 @@ def main():
                     world[0, 0] += np.random.rand(H_GRID, W_GRID) * 0.02
                     world[0, 0] = np.clip(world[0,0], 0.0, 1.0)
                     tick_count += 1
+
+        # Adaptive auto-save interval based on game speed to ensure ~1 save per second
+        if speed_mode == 1: save_interval = 60
+        elif speed_mode == 5: save_interval = 300
+        elif speed_mode == 20: save_interval = 1200
+        else: save_interval = 5000
+
+        if tick_count > 0 and tick_count - last_autosave_tick >= save_interval:
+            last_autosave_tick = tick_count
+            save_state(f"saves/wight-world_{seed_str}.npz", world, tick_count, seed_str, np.random.get_state(), ui_prev, ui_events, lineage_history, ui_flags)
 
         # Render visual channels
         t = world[0]
