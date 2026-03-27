@@ -290,6 +290,41 @@ def drop_organism(world, gx, gy, lineage_id=None):
         weights[lineage_id] = 20.0
     world[0, 4:, gy, gx] = weights
 
+def evaluate_milestones(pop, max_age, avg_drain, prev_state, flags):
+    """
+    Evaluates ecological statistics to generate emergence events.
+    Shared identically between Headless and UI rendering.
+    Returns:
+        events: List of string descriptions of events that just occurred.
+    """
+    events = []
+
+    if prev_state['pop'] is not None:
+        if pop < prev_state['pop'] * 0.5:
+            events.append(f"population crash  {prev_state['pop']} -> {pop}")
+        elif pop > prev_state['pop'] * 2.0:
+            events.append(f"population boom  {prev_state['pop']} -> {pop}")
+
+    if max_age >= 1000 and 'age_1k' not in flags:
+        events.append("longevity unlocked - max age > 1,000")
+        flags.add('age_1k')
+    elif max_age >= 5000 and 'age_5k' not in flags:
+        events.append("immortality - max age > 5,000")
+        flags.add('age_5k')
+
+    if prev_state['d_avg'] is not None:
+        if avg_drain > prev_state['d_avg'] * 1.5 and avg_drain > 50:
+            events.append(f"metabolism surging  {prev_state['d_avg']} -> {avg_drain}")
+        elif avg_drain < prev_state['d_avg'] * 0.6 and prev_state['d_avg'] > 50:
+            events.append(f"efficiency breakthrough  {prev_state['d_avg']} -> {avg_drain}")
+
+    # Update state history in place
+    prev_state['pop'] = pop
+    prev_state['d_avg'] = avg_drain
+
+    return events
+
+
 def main():
     parser = argparse.ArgumentParser(description="wight-world neuroevolution engine")
     parser.add_argument("--headless", action="store_true", help="Run in terminal without UI")
@@ -371,31 +406,10 @@ def main():
                     avg_drain = int(drains[mask].mean() * 100)
                     print(f"{i:8d} {pop:6d} {avg_e:6d} {max_e:6d} {avg_age:6d} {max_age:6d} {avg_drain:6d} {max_drain:6d}  {elapsed:.1f}s")
 
-                    notes = []
-                    if _prev['pop'] is not None:
-                        if pop < _prev['pop'] * 0.5:
-                            notes.append(f"population crash  {_prev['pop']} -> {pop}")
-                        elif pop > _prev['pop'] * 2.0:
-                            notes.append(f"population boom  {_prev['pop']} -> {pop}")
-
-                    if max_age >= 1000 and 'age_1k' not in _flags:
-                        notes.append("longevity unlocked - max age > 1,000")
-                        _flags.add('age_1k')
-                    elif max_age >= 5000 and 'age_5k' not in _flags:
-                        notes.append("immortality - max age > 5,000")
-                        _flags.add('age_5k')
-
-                    if _prev['d_avg'] is not None:
-                        if avg_drain > _prev['d_avg'] * 1.5 and avg_drain > 50:
-                            notes.append(f"metabolism surging  {_prev['d_avg']} -> {avg_drain}")
-                        elif avg_drain < _prev['d_avg'] * 0.6 and _prev['d_avg'] > 50:
-                            notes.append(f"efficiency breakthrough  {_prev['d_avg']} -> {avg_drain}")
-
+                    notes = evaluate_milestones(pop, max_age, avg_drain, _prev, _flags)
                     for note in notes:
                         print(f"          ↳ {note}")
 
-                    _prev['pop'] = pop
-                    _prev['d_avg'] = avg_drain
                 else:
                     print(f"{i:8d}      EXTINCT")
                     break
@@ -621,27 +635,10 @@ def main():
             if tick_count // 120 > last_event_tick // 120:
                 last_event_tick = tick_count
 
-                if ui_prev['pop'] is not None:
-                    if pop < ui_prev['pop'] * 0.5:
-                        ui_events.append(f"[{tick_count}] population crash  {ui_prev['pop']} -> {pop}")
-                    elif pop > ui_prev['pop'] * 2.0:
-                        ui_events.append(f"[{tick_count}] population boom  {ui_prev['pop']} -> {pop}")
+                new_events = evaluate_milestones(pop, max_age, avg_drain, ui_prev, ui_flags)
+                for ev in new_events:
+                    ui_events.append(f"[{tick_count}] {ev}")
 
-                if max_age >= 1000 and 'age_1k' not in ui_flags:
-                    ui_events.append(f"[{tick_count}] longevity unlocked - max age > 1,000")
-                    ui_flags.add('age_1k')
-                elif max_age >= 5000 and 'age_5k' not in ui_flags:
-                    ui_events.append(f"[{tick_count}] immortality - max age > 5,000")
-                    ui_flags.add('age_5k')
-
-                if ui_prev['d_avg'] is not None:
-                    if avg_drain > ui_prev['d_avg'] * 1.5 and avg_drain > 50:
-                        ui_events.append(f"[{tick_count}] metabolism surging  {ui_prev['d_avg']} -> {avg_drain}")
-                    elif avg_drain < ui_prev['d_avg'] * 0.6 and ui_prev['d_avg'] > 50:
-                        ui_events.append(f"[{tick_count}] efficiency breakthrough  {ui_prev['d_avg']} -> {avg_drain}")
-
-                ui_prev['pop'] = pop
-                ui_prev['d_avg'] = avg_drain
                 ui_events = ui_events[-200:] # Keep last 200 in raw history
 
             trow(["", "MIN", "AVG", "MAX", "STD"], font_sm, (170, 180, 210))
