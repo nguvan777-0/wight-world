@@ -290,7 +290,7 @@ def drop_organism(world, gx, gy, lineage_id=None):
         weights[lineage_id] = 20.0
     world[0, 4:, gy, gx] = weights
 
-def evaluate_milestones(pop, max_age, avg_drain, total_food, lineage_counts, prev_state, flags):
+def evaluate_milestones(pop, avg_age, max_age, avg_drain, max_weight_abs, total_food, lineage_counts, prev_state, flags):
     """
     Evaluates ecological statistics to generate emergence events.
     Shared identically between Headless and UI rendering.
@@ -320,13 +320,31 @@ def evaluate_milestones(pop, max_age, avg_drain, total_food, lineage_counts, pre
         if total_food < 100 and prev_state['food'] >= 100:
             events.append("widespread famine: food resources exhausted")
 
+    # Resource Saturation
+    if total_food > W_GRID * H_GRID * 0.80 * 100 and 'food_sat' not in flags:
+        events.append("resource saturation: global food availability has reached peak capacity")
+        flags.add('food_sat')
+    elif total_food < W_GRID * H_GRID * 0.50 * 100 and 'food_sat' in flags:
+        flags.remove('food_sat')
+
+    # Critical density
+    if pop > W_GRID * H_GRID * 0.30 and 'overcrowded' not in flags:
+        events.append("critical density warning: ecosystem is becoming severely overcrowded")
+        flags.add('overcrowded')
+    elif pop < W_GRID * H_GRID * 0.20 and 'overcrowded' in flags:
+        flags.remove('overcrowded')
+
     # Speciation & Survival Tracking
     if pop > 0 and len(lineage_counts) > 0:
         # Dominance Shift
         if pop > 100:
             dom_id = max(lineage_counts, key=lineage_counts.get)
             dom_pct = lineage_counts[dom_id] / pop
-            if dom_pct >= 0.60 and prev_state['dom'] != dom_id:
+
+            if len(lineage_counts) == 1 and len(prev_state['lineages']) > 1 and dom_pct == 1.0:
+                events.append(f"global fixation: lineage {dom_id} has achieved total monoculture")
+                prev_state['dom'] = dom_id
+            elif dom_pct >= 0.60 and prev_state['dom'] != dom_id:
                 events.append(f"lineage {dom_id} has become the dominant lineage ({int(dom_pct*100)}% of population)")
                 prev_state['dom'] = dom_id
 
@@ -334,6 +352,13 @@ def evaluate_milestones(pop, max_age, avg_drain, total_food, lineage_counts, pre
         for lid, count in lineage_counts.items():
             if count >= 1:
                 flags.add(f"est_{lid}")
+
+            # Bottleneck Recovery Tracking
+            if count < 5 and count > 0:
+                flags.add(f"endangered_{lid}")
+            elif count > 100 and f"endangered_{lid}" in flags:
+                events.append(f"bottleneck recovery: lineage {lid} has resurged from a critical population low")
+                flags.remove(f"endangered_{lid}")
 
         # Extinction Events
         if prev_state['pop'] is not None and prev_state['pop'] > 0:
@@ -349,6 +374,16 @@ def evaluate_milestones(pop, max_age, avg_drain, total_food, lineage_counts, pre
     elif max_age >= 5000 and 'age_5k' not in flags:
         events.append("immortality - max age > 5,000")
         flags.add('age_5k')
+
+    if avg_age > 1000 and 'stagnation' not in flags:
+        events.append("low-turnover ecosystem: average population age has surpassed 1,000")
+        flags.add('stagnation')
+    elif avg_age < 500 and 'stagnation' in flags:
+        flags.remove('stagnation')
+
+    if max_weight_abs > 50.0 and 'extreme_brain' not in flags:
+        events.append("phenotypic divergence: extreme neural specialization detected")
+        flags.add('extreme_brain')
 
     if prev_state['d_avg'] is not None:
         if avg_drain > prev_state['d_avg'] * 1.5 and avg_drain > 50:
@@ -452,7 +487,7 @@ def main():
                     unique_lids, counts = np.unique(lineages, return_counts=True)
                     lineage_counts = dict(zip([int(k) for k in unique_lids], [int(c) for c in counts]))
 
-                    notes = evaluate_milestones(pop, max_age, avg_drain, total_food, lineage_counts, _prev, _flags)
+                    notes = evaluate_milestones(pop, avg_age, max_age, avg_drain, float(np.abs(alive_weights).max()), total_food, lineage_counts, _prev, _flags)
                     for note in notes:
                         print(f"          ↳ {note}")
 
@@ -685,7 +720,7 @@ def main():
                 last_event_tick = tick_count
 
                 new_events = evaluate_milestones(
-                    pop, max_age, avg_drain, total_food, dict(current_lineages), ui_prev, ui_flags
+                    pop, avg_age, max_age, avg_drain, float(np.abs(weights[:, y_idx, x_idx]).max()), total_food, dict(current_lineages), ui_prev, ui_flags
                 )
                 for ev in new_events:
                     ui_events.append(f"[{tick_count}] {ev}")
