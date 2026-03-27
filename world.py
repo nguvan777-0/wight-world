@@ -1051,13 +1051,15 @@ def main():
         # Clip to prevent event ticker text from bleeding into the matrix
         screen.set_clip(pygame.Rect(0, 0, LOG_WIDTH - 2, H_PX))
 
-        box_x = 10
-        box_y = 10
-        screen.blit(font.render("LIVE EVENTS", True, (255, 210, 120)), (box_x, box_y))
+        ui_margin_x = 10
+        ui_right_edge = LOG_WIDTH - 8
 
-        # Word Wrap Logic
+        box_y = 10
+        screen.blit(font.render("EMERGENCE LOG", True, (255, 210, 120)), (ui_margin_x, box_y))
+
+        # Word Wrap Logic - fixed right boundary
         wrapped_lines = []
-        max_width = LOG_WIDTH - 20
+        max_width = ui_right_edge - ui_margin_x
         for ev in ui_events:
             # Color coding keywords
             ev_lower = ev.lower()
@@ -1097,13 +1099,13 @@ def main():
         e_y = box_y + 25
         visible_lines = wrapped_lines[start_idx:start_idx + max_lines_fit]
         for line_text, line_color in visible_lines:
-            screen.blit(font_sm.render(line_text, True, line_color), (box_x, e_y))
+            screen.blit(font_sm.render(line_text, True, line_color), (ui_margin_x, e_y))
             e_y += line_spacing
 
         # Wight Inspector
         insp_y = H_PX - 320
-        pygame.draw.line(screen, (50, 50, 80), (10, insp_y - 15), (LOG_WIDTH - 10, insp_y - 15), 1)
-        screen.blit(font.render("WIGHT INSPECTOR", True, (255, 210, 120)), (10, insp_y))
+        pygame.draw.line(screen, (50, 50, 80), (ui_margin_x, insp_y - 15), (LOG_WIDTH - ui_margin_x, insp_y - 15), 1)
+        screen.blit(font.render("WIGHT INSPECTOR", True, (255, 210, 120)), (ui_margin_x, insp_y))
 
         # Remove clip explicitly before Matrix/Tracking logic that draws into main screen
         screen.set_clip(None)
@@ -1163,7 +1165,7 @@ def main():
             c = _LINEAGE_COLORS[lid]
 
             # Big portrait
-            pw, py = 45, insp_y + 45
+            pw, py = ui_margin_x + 30, insp_y + 45
             pygame.draw.circle(screen, c, (pw, py), 30)
             pygame.draw.circle(screen, (255, 255, 255), (pw, py), 30, 2)
             ax = pw + int(np.cos(w_val[0] * np.pi) * 30 * 1.0)
@@ -1181,28 +1183,45 @@ def main():
                 pygame.draw.line(screen, (255, 50, 50), (pw-20, py-20), (pw+20, py+20), 3)
                 pygame.draw.line(screen, (255, 50, 50), (pw-20, py+20), (pw+20, py-20), 3)
 
-            tx1, tx2 = 85, 200
+            tx1 = ui_margin_x + 70
+            tx2 = ui_margin_x + 145
             screen.blit(font.render(spec_str, True, c), (tx1, insp_y + 10))
 
             # Column 1
-            screen.blit(font_sm.render(f"Pos: ({wight['x']}, {wight['y']})", True, stat_color), (tx1, insp_y + 30))
+            screen.blit(font_sm.render(f"XY: {wight['x']},{wight['y']}", True, stat_color), (tx1, insp_y + 30))
             screen.blit(font_sm.render(f"Age: {int(wight['a'])}", True, stat_color), (tx1, insp_y + 45))
             # Column 2
             screen.blit(font_sm.render(f"Nrg: {wight['e']:.2f}", True, stat_color), (tx2, insp_y + 30))
             screen.blit(font_sm.render(f"Met: {wight['d']:.2f}", True, stat_color), (tx2, insp_y + 45))
 
-            # Brain Bar Graph - Matrix Layout (Food, Scent, Nrg across N,S,E,W,Stay)
-            # Headers
+            # Brain Bar Graph - Matrix Layout (Scaled Proportions)
             w_y = insp_y + 75
             head_c = (150, 150, 180)
-            screen.blit(font_sm.render("Food", True, head_c), (55, w_y))
-            screen.blit(font_sm.render("Scent", True, head_c), (105, w_y))
-            screen.blit(font_sm.render("Nrg", True, head_c), (155, w_y))
+
+            # Mathematical layout for the Grid
+            row_header_w = font_sm.size("Stay: ")[0]
+            col_start_x = ui_margin_x + row_header_w + 5
+            graph_width = ui_right_edge - col_start_x
+            col_w = graph_width / 3.0
+            bar_max_w = int(col_w - 6) # gap between columns
+
+            # Headers centered over columns
+            cats = ["Food", "Scent", "Nrg"]
+            for col_idx, cat_name in enumerate(cats):
+                cat_surf = font_sm.render(cat_name, True, head_c)
+                cat_x = col_start_x + (col_idx * col_w) + (bar_max_w / 2) - (cat_surf.get_width() / 2)
+                screen.blit(cat_surf, (cat_x, w_y))
 
             dirs = ["Stay", "N", "S", "E", "W"]
             for row_idx, d_name in enumerate(dirs):
                 r_y = w_y + 20 + (row_idx * 16)
-                screen.blit(font_sm.render(f"{d_name:>4}:", True, (200, 200, 220)), (10, r_y))
+
+                # Right adapt the directional header so the colons align
+                header_surf = font_sm.render(f"{d_name:>4}:", True, (200, 200, 220))
+                hx = col_start_x - 5 - font_sm.size(f"{d_name:>4}:")[0]
+                # Fallback to left margin if it overflows
+                hx = max(ui_margin_x, hx)
+                screen.blit(header_surf, (hx, r_y))
 
                 # Each direction has 3 components (Food, Scent, nrg)
                 for col_idx in range(3):
@@ -1210,62 +1229,85 @@ def main():
                     val = w_val[w_idx]
                     percent = (val + 8) / 16.0
 
-                    bar_w = int(percent * 35)
-                    bar_w = max(0, min(35, bar_w))
-                    bx = 55 + (col_idx * 50)
+                    bar_w = int(percent * bar_max_w)
+                    bar_w = max(0, min(bar_max_w, bar_w))
+                    bx = col_start_x + (col_idx * col_w)
 
-                    bg_rect = (bx, r_y + 2, 35, 8)
+                    bg_rect = (bx, r_y + 2, bar_max_w, 8)
                     pygame.draw.rect(screen, (40, 40, 50), bg_rect) # background groove
 
                     bar_color = get_lerp_color(percent)
                     pygame.draw.rect(screen, bar_color, (bx, r_y + 2, bar_w, 8))
 
-                    # Optional: tiny value overlay
-                    # tiny_v = int(val)
-                    # screen.blit(font_sm.render(f"{tiny_v}", True, (255,255,255)), (bx+2, r_y-1))
+            # --- EVALUATION & CONTEXT (Fills bottom-left) ---
+            fav_dir_idx = int(np.argmax([np.sum(w_val[i*3:(i+1)*3]) for i in range(5)]))
+            fav_dir = dirs[fav_dir_idx]
 
-            # Draw an evaluation sparkline or extra context if alive
             if wight.get('status') != 'DEAD':
-                fav_dir_idx = int(np.argmax([np.sum(w_val[i*3:(i+1)*3]) for i in range(5)]))
-                fav_dir = dirs[fav_dir_idx]
                 eval_str = f"Intent: {fav_dir}"
-                screen.blit(font_sm.render(eval_str, True, (120, 255, 120)), (10, r_y + 25))
+                screen.blit(font_sm.render(eval_str, True, (120, 255, 120)), (ui_margin_x, r_y + 28))
+            else:
+                eval_str = f"Last Intent: {fav_dir}"
+                screen.blit(font_sm.render(eval_str, True, (150, 150, 160)), (ui_margin_x, r_y + 28))
 
-                # --- LOCAL SENSORY RADAR (5x5 viewport) ---
-                # Utilizes the empty space below the matrix to show immediate neighborhood
-                map_x = 110
-                map_y = r_y + 25
-                screen.blit(font_sm.render("Local Sensory Radar", True, head_c), (map_x - 10, map_y))
+            # Determine overriding brain drive (sum of absolute weights per input channel)
+            drives = ["Food", "Scent", "Nrg"]
+            drive_sums = [np.sum(np.abs([w_val[r*3 + c] for r in range(5)])) for c in range(3)]
+            primary_drive = drives[int(np.argmax(drive_sums))]
+            screen.blit(font_sm.render(f"Drive: {primary_drive}", True, (200, 200, 220)), (ui_margin_x, r_y + 44))
 
-                cell_s = 14
-                t_state = world[0]
+            t_state = world[0]
+            curr_x, curr_y = wight['x'], wight['y']
 
-                # Draw a nice grid housing
-                grid_bg_x = map_x - 4
-                grid_bg_y = map_y + 20
-                pygame.draw.rect(screen, (40, 40, 50), (grid_bg_x, grid_bg_y, cell_s*5 + 7, cell_s*5 + 7), 1)
+            # Show actual environmental sensor data for the precise tile it is standing on
+            tile_f = t_state[0, curr_y, curr_x]
+            tile_o = t_state[1, curr_y, curr_x]
+            screen.blit(font_sm.render(f"Tile Food:  {tile_f:.2f}", True, (150, 200, 150)), (ui_margin_x, r_y + 64))
+            screen.blit(font_sm.render(f"Tile Scent: {tile_o:.2f}", True, (200, 150, 150)), (ui_margin_x, r_y + 78))
 
-                for dy in range(-2, 3):
-                    for dx in range(-2, 3):
-                        vx = (wight['x'] + dx) % W_GRID
-                        vy = (wight['y'] + dy) % H_GRID
+            # --- LOCAL SENSORY RADAR (5x5 viewport) ---
+            # Positioned relative to ui_right_edge
+            cell_s = 14
+            grid_w = (cell_s * 5) + 5
+            grid_bg_x = ui_right_edge - grid_w
+            map_y = r_y + 24
 
-                        f_val = t_state[0, vy, vx]
-                        o_val = t_state[1, vy, vx]
+            title_surf = font_sm.render("Local Vision", True, head_c)
+            # Center title exactly over the grid housing
+            title_x = grid_bg_x + (grid_w / 2) - (title_surf.get_width() / 2)
+            screen.blit(title_surf, (title_x, map_y))
 
-                        r_c = min(255, int(o_val * 255) + 30)
-                        g_c = min(255, int(f_val * 180) + 30)
-                        b_c = 40
+            # Draw a nice grid housing
+            grid_bg_y = map_y + 16
+            pygame.draw.rect(screen, (40, 40, 50), (grid_bg_x, grid_bg_y, grid_w, grid_w), 1)
 
-                        if dx == 0 and dy == 0:
-                            # highlight center (self) purely white
+            inner_x_start = grid_bg_x + 3
+            inner_y_start = grid_bg_y + 3
+
+            for dy in range(-2, 3):
+                for dx in range(-2, 3):
+                    vx = (wight['x'] + dx) % W_GRID
+                    vy = (wight['y'] + dy) % H_GRID
+
+                    f_val = t_state[0, vy, vx]
+                    o_val = t_state[1, vy, vx]
+
+                    r_c = min(255, int(o_val * 255) + 30)
+                    g_c = min(255, int(f_val * 180) + 30)
+                    b_c = 40
+
+                    if dx == 0 and dy == 0:
+                        # Highlight center (self): Red if dead, bright white otherwise
+                        if wight.get('status') == 'DEAD':
+                            r_c, g_c, b_c = 255, 50, 50
+                        else:
                             r_c, g_c, b_c = 255, 255, 255
 
-                        sq_x = map_x + (dx + 2) * cell_s
-                        sq_y = map_y + 22 + (dy + 2) * cell_s
-                        pygame.draw.rect(screen, (r_c, g_c, b_c), (sq_x, sq_y, cell_s - 1, cell_s - 1))
+                    sq_x = inner_x_start + (dx + 2) * cell_s
+                    sq_y = inner_y_start + (dy + 2) * cell_s
+                    pygame.draw.rect(screen, (r_c, g_c, b_c), (sq_x, sq_y, cell_s - 1, cell_s - 1))
         else:
-            screen.blit(font_sm.render("Hover over matrix to inspect.", True, (120, 120, 130)), (10, insp_y + 25))
+            screen.blit(font_sm.render("Hover over matrix to inspect.", True, (120, 120, 130)), (ui_margin_x, insp_y + 25))
 
         pygame.display.flip()
 
