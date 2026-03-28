@@ -6,20 +6,31 @@ wight-world is a neuroevolution engine that executes natural selection purely th
 
 > *Life thrives at the boundary of states. Inject an energy gradient into a static tensor, and the math will organize to transform it.*
 
-This project abandons object-oriented loops in favor of **hardware-native natural selection**. The entire ecosystem is a single contiguous tensor where the laws of physics and biology are reduced to simultaneous 2D convolutions.
+This project abandons object-oriented loops in favor of **hardware-native natural selection**. The entire ecosystem is a single contiguous tensor where the laws of biology—energy transformation, spatial translation, and tensor mitosis—are reduced to simultaneous 2D convolutions. No loops, no lists, just single-pass tensor updates.
 
-Apple designed the Apple Neural Engine (ANE) for FaceID and computational photography. By formatting the laws of biology—energy transformation, spatial translation, and tensor mitosis—exclusively as spatial matrix operations, we hijack that exact hardware to execute natural selection natively. No loops, no lists, just single-pass tensor updates.
-
-Because there are no arrays of objects to iterate through, time complexity is a flat **`O(1)`** wall-clock per tick, completely decoupled from population size. Space complexity is locked at **`O(W × H)`**. The ANE evaluates the entire ecosystem in a single hardware dispatch whether there are 5 wights alive or 64,000.
+Because there are no arrays of objects to iterate through, time complexity is a flat **`O(1)`** wall-clock per tick, completely decoupled from population size. Space complexity is locked at **`O(W × H)`**. The hardware evaluates the entire ecosystem in a single dispatch whether there are 5 wights alive or 64,000.
 
 ## Substrate
 
 1. **The Tensor World:** A 3D matrix of size `[Width, Height, Channels]`. Empty space is `0.0`. A piece of food is a positive number in the `CH_FOOD` channel.
 2. **The Wight:** A single pixel—an 18-channel depth column at a specific coordinate (1 energy state, 1 age, 1 energy drain accumulator, and 15 neural weights). A wight has no discrete body or positional state—it is exactly its brain.
-4. **Evolution without Code:**
+3. **Evolution without Code:**
    - Survival: If a coordinate's `Energy` channel hits zero, we multiply its depth column by `0`. It vanishes.
    - Reproduction: If a coordinate acquires enough `Energy`, it copies its brain weights into an adjacent coordinate.
    - Mutation: During the copy, random noise (`numpy.random`) is injected into the weights.
+
+## A Universe on Apple Silicon
+
+
+
+Because the physics and biology are compiled into a unified Core ML graph, the entire simulation executes live on the ANE. There is no supervisor algorithm pausing the universe to calculate fitness or orchestrate reproduction. The physics just run, and evolution happens exactly as a byproduct of those rules—without any extrinsic generation loops or defined fitness functions:
+
+- **Weights == Organism:** A wight is solely its 15 neural weight channels. There is no separate code-object or phenotype.
+- **Selection by Physics:** Survival simply means maintaining `energy > 0.0`. If a wight's matrix multiplication moves it towards food channels, it accumulates enough energy to copy its weights to an adjacent coordinate via tensor slicing. If it runs out of energy, its channels are multiplied by `0.0`.
+
+The tensor does not evaluate its contents. It simply applies spatial convolutions identically across the matrix. The weights that survive the convolution, continue.
+
+In this architecture, Python is not the runtime, just the scaffolding. We have pushed natural selection down to the hardware itself. The UI is merely a digital telescope—observing and measuring the ecosystem as it evolves inside the silicon.
 
 ## Let there be wight
 
