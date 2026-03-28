@@ -708,6 +708,8 @@ def main():
                     ui_events_scroll = 0
                     lineage_history.clear()
                     last_inspected_wight = None
+                    cached_pca_surf = None
+                    cached_pca_tick = -1
                 elif event.key == pygame.K_s or getattr(event, 'unicode', '').lower() == 's':
                     flash_s = 15
                     os.makedirs("screenshots", exist_ok=True)
