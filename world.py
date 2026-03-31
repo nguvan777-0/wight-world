@@ -45,6 +45,11 @@ WEIGHT_NAMES = [
     "W:Food", "W:Scent", "W:nrg"
 ]
 
+def generate_seed_str():
+    """Generates 6-character high-entropy alphanumeric seed (vowels excluded to avoid semantic collisions)"""
+    seed_charset = (string.digits * 4) + "bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ"
+    return "".join(random.choices(seed_charset, k=6))
+
 def get_lerp_color(t_val, lo=(60, 100, 200), mid=(60, 200, 120), hi=(220, 80, 60)):
     t_val = max(0.0, min(1.0, t_val))
     if t_val < 0.5:
@@ -459,8 +464,7 @@ def main():
     else:
         seed_str = args.seed
         if seed_str is None:
-            # Generate a fun readable 6-character random seed string with mixed case
-            seed_str = "".join(random.choices(string.ascii_letters, k=6))
+            seed_str = generate_seed_str()
 
         # Deterministically hash the string to a 32-bit int for numpy
         seed_int = int(hashlib.sha256(seed_str.encode('utf-8')).hexdigest(), 16) % (2**32)
@@ -695,7 +699,7 @@ def main():
                     print("Set speed to MAX")
                 elif event.key == pygame.K_r or getattr(event, 'unicode', '').lower() == 'r':
                     flash_r = 15
-                    seed_str = "".join(random.choices(string.ascii_letters, k=6))
+                    seed_str = generate_seed_str()
                     seed_int = int(hashlib.sha256(seed_str.encode('utf-8')).hexdigest(), 16) % (2**32)
                     print(f"\n[ wight-world | seed: '{seed_str}' ]")
                     print("Restarted world")
