@@ -62,15 +62,15 @@ def get_lerp_color(t_val, lo=(60, 100, 200), mid=(60, 200, 120), hi=(220, 80, 60
 # We represent 5 discrete choices: 0:Stay, 1:North, 2:South, 3:East, 4:West
 # To process movement, every pixel "pulls" the state of wights wanting to enter it.
 def create_pull_kernels():
-    k_stay = np.zeros((1, 1, 3, 3), dtype=np.float32); k_stay[0,0,1,1] = 1.0
+    k_stay = np.zeros((1, 1, 3, 3), dtype=np.float16); k_stay[0,0,1,1] = 1.0
     # Intent 1: Move North -> We pull from the cell BELOW us (Bottom)
-    k_pull_from_B = np.zeros((1, 1, 3, 3), dtype=np.float32); k_pull_from_B[0,0,2,1] = 1.0
+    k_pull_from_B = np.zeros((1, 1, 3, 3), dtype=np.float16); k_pull_from_B[0,0,2,1] = 1.0
     # Intent 2: Move South -> We pull from the cell ABOVE us (Top)
-    k_pull_from_T = np.zeros((1, 1, 3, 3), dtype=np.float32); k_pull_from_T[0,0,0,1] = 1.0
+    k_pull_from_T = np.zeros((1, 1, 3, 3), dtype=np.float16); k_pull_from_T[0,0,0,1] = 1.0
     # Intent 3: Move East -> We pull from the cell to our LEFT
-    k_pull_from_L = np.zeros((1, 1, 3, 3), dtype=np.float32); k_pull_from_L[0,0,1,0] = 1.0
+    k_pull_from_L = np.zeros((1, 1, 3, 3), dtype=np.float16); k_pull_from_L[0,0,1,0] = 1.0
     # Intent 4: Move West -> We pull from the cell to our RIGHT
-    k_pull_from_R = np.zeros((1, 1, 3, 3), dtype=np.float32); k_pull_from_R[0,0,1,2] = 1.0
+    k_pull_from_R = np.zeros((1, 1, 3, 3), dtype=np.float16); k_pull_from_R[0,0,1,2] = 1.0
     return [k_stay, k_pull_from_B, k_pull_from_T, k_pull_from_L, k_pull_from_R]
 
 def mb_circular_pad(x):
@@ -99,13 +99,14 @@ def build_evolution_engine():
     pull_k_int = [np.repeat(k, 5, axis=0) for k in kernels]          # Shift the 5 intention output channels
 
     # Simple uniform blur for food sensing
-    k_blur = np.ones((1, 1, 3, 3), dtype=np.float32) / 9.0
+    k_blur = np.ones((1, 1, 3, 3), dtype=np.float16) / 9.0
 
     @mb.program(input_specs=[
-        mb.TensorSpec(shape=(1, CH_TOTAL, H_GRID, W_GRID)),
-        mb.TensorSpec(shape=(1, CH_WEIGHTS, H_GRID, W_GRID))
+        mb.TensorSpec(shape=(1, CH_TOTAL, H_GRID, W_GRID), dtype=ct.converters.mil.mil.types.fp16),
+        mb.TensorSpec(shape=(1, CH_WEIGHTS, H_GRID, W_GRID), dtype=ct.converters.mil.mil.types.fp16),
+        mb.TensorSpec(shape=(1, 1, H_GRID, W_GRID), dtype=ct.converters.mil.mil.types.fp16)
     ])
-    def world_step(world, mutation):
+    def world_step(world, mutation, food_growth):
         # 1. SLICE WORLD CHANNELS
         food_layer = mb.slice_by_index(x=world, begin=[0,0,0,0], end=[1,1,H_GRID,W_GRID])
         org_layer  = mb.slice_by_index(x=world, begin=[0,1,0,0], end=[1,CH_TOTAL,H_GRID,W_GRID])
@@ -138,20 +139,20 @@ def build_evolution_engine():
 
         # Use reduce_argmax to break ties and prevent FP16 duplicates
         best_idx = mb.reduce_argmax(x=intent_scores, axis=1) # Shape: (1, H, W)
-        best_idx = mb.cast(x=best_idx, dtype="fp32")
+        best_idx = mb.cast(x=best_idx, dtype="fp16")
         best_idx_expanded = mb.expand_dims(x=best_idx, axes=[1]) # Shape: (1, 1, H, W)
 
         onehot_channels = []
         for d in range(5):
-            d_val = np.array([[[[d]]]], dtype=np.float32)
-            c = mb.cast(x=mb.equal(x=best_idx_expanded, y=d_val), dtype="fp32")
+            d_val = np.array([[[[d]]]], dtype=np.float16)
+            c = mb.cast(x=mb.equal(x=best_idx_expanded, y=d_val), dtype="fp16")
             onehot_channels.append(c)
 
         raw_intent_1hot = mb.concat(values=onehot_channels, axis=1) # Shape: (1, 5, H, W)
 
         # Prevent completely empty background cells from generating empty-cell movement intentions
         # that interfere with the collision ladder and overwrite living wights
-        has_energy = mb.cast(x=mb.greater(x=energy, y=np.float32(0.0)), dtype="fp32")
+        has_energy = mb.cast(x=mb.greater(x=energy, y=np.float16(0.0)), dtype="fp16")
         intent_1hot = mb.mul(x=raw_intent_1hot, y=has_energy)
 
         # 5. SHIFT-AND-MASK TO RESOLVE MOVEMENT
@@ -182,7 +183,7 @@ def build_evolution_engine():
                 w = cands_valid[0]
                 cum_w = w
             else:
-                w = mb.mul(x=cands_valid[d], y=mb.sub(x=np.float32(1.0), y=cum_w))
+                w = mb.mul(x=cands_valid[d], y=mb.sub(x=np.float16(1.0), y=cum_w))
                 cum_w = mb.add(x=cum_w, y=w)
             # Add winner into the new state (Losers are multiplied by 0.0)
             term = mb.mul(x=cands_org[d], y=w)
@@ -196,24 +197,24 @@ def build_evolution_engine():
         shifted_weights = mb.slice_by_index(x=final_org, begin=[0,3,0,0], end=[1,CH_ORG,H_GRID,W_GRID])
 
         # Burn energy every tick
-        tick_drain = np.float32(0.01)
+        tick_drain = np.float16(0.01)
         post_move_energy = mb.sub(x=shifted_energy, y=tick_drain)
-        is_there = mb.cast(x=mb.greater(x=post_move_energy, y=np.float32(0.0)), dtype="fp32")
+        is_there = mb.cast(x=mb.greater(x=post_move_energy, y=np.float16(0.0)), dtype="fp16")
 
         new_age = mb.add(x=shifted_age, y=is_there)
         new_drain = mb.add(x=shifted_drain, y=mb.mul(x=is_there, y=tick_drain))
 
         # If alive, eat the food we are standing on
         can_eat = mb.mul(x=food_layer, y=is_there)
-        food_eaten = mb.clip(x=can_eat, alpha=np.float32(0.0), beta=np.float32(0.9))
+        food_eaten = mb.clip(x=can_eat, alpha=np.float16(0.0), beta=np.float16(0.9))
 
         # Update biological energy
         new_energy = mb.add(x=post_move_energy, y=food_eaten)
-        new_energy = mb.clip(x=new_energy, alpha=np.float32(0.0), beta=np.float32(1.0))
+        new_energy = mb.clip(x=new_energy, alpha=np.float16(0.0), beta=np.float16(1.0))
         new_food = mb.sub(x=food_layer, y=food_eaten)
 
         # Basic death mask before reproduction
-        is_alive_now = mb.cast(x=mb.greater(x=new_energy, y=np.float32(0.0)), dtype="fp32")
+        is_alive_now = mb.cast(x=mb.greater(x=new_energy, y=np.float16(0.0)), dtype="fp16")
         base_energy = mb.mul(x=new_energy, y=is_alive_now)
         base_age    = mb.mul(x=new_age, y=is_alive_now)
         base_drain  = mb.mul(x=new_drain, y=is_alive_now)
@@ -221,10 +222,10 @@ def build_evolution_engine():
 
         # 7. MITOSIS (Reproduction & Mutation)
         # Parent decides to reproduce if energy > 0.8
-        can_reproduce = mb.cast(x=mb.greater(x=base_energy, y=np.float32(0.8)), dtype="fp32")
+        can_reproduce = mb.cast(x=mb.greater(x=base_energy, y=np.float16(0.8)), dtype="fp16")
 
         # Parent loses half energy if reproducing
-        cost = mb.mul(x=base_energy, y=mb.mul(x=can_reproduce, y=np.float32(0.5)))
+        cost = mb.mul(x=base_energy, y=mb.mul(x=can_reproduce, y=np.float16(0.5)))
         parent_energy = mb.sub(x=base_energy, y=cost)
 
         # Offspring payload: gets the cost energy, parent's weights + random mutation noise
@@ -233,7 +234,7 @@ def build_evolution_engine():
         offspring_e_send = cost
 
         # Offspring has 0 age and 0 drain
-        offspring_zero = mb.mul(x=cost, y=np.float32(0.0))
+        offspring_zero = mb.mul(x=cost, y=np.float16(0.0))
         offspring_a_send = offspring_zero
         offspring_d_send = offspring_zero
 
@@ -243,7 +244,7 @@ def build_evolution_engine():
         inbound_offspring = mb.conv(x=pad_offspring, weight=pull_k_org[4], pad_type="valid", groups=CH_ORG)
 
         # Offspring only survives if it lands on a cell that parent_energy currently evaluates as empty
-        is_empty = mb.cast(x=mb.equal(x=parent_energy, y=np.float32(0.0)), dtype="fp32")
+        is_empty = mb.cast(x=mb.equal(x=parent_energy, y=np.float16(0.0)), dtype="fp16")
         landed_offspring = mb.mul(x=inbound_offspring, y=is_empty)
 
         landed_e = mb.slice_by_index(x=landed_offspring, begin=[0,0,0,0], end=[1,1,H_GRID,W_GRID])
@@ -255,7 +256,7 @@ def build_evolution_engine():
         final_energy = mb.add(x=parent_energy, y=landed_e)
 
         # Ensure parent weights are zeroed if dead
-        parent_alive = mb.cast(x=mb.greater(x=parent_energy, y=np.float32(0.0)), dtype="fp32")
+        parent_alive = mb.cast(x=mb.greater(x=parent_energy, y=np.float16(0.0)), dtype="fp16")
         kept_a = mb.mul(x=base_age, y=parent_alive)
         kept_d = mb.mul(x=base_drain, y=parent_alive)
         kept_w = mb.mul(x=base_weights, y=parent_alive)
@@ -266,7 +267,12 @@ def build_evolution_engine():
 
         # Reconstruct org channels
         next_org = mb.concat(values=[final_energy, final_age, final_drain, final_weights], axis=1)
-        next_world = mb.concat(values=[new_food, next_org], axis=1)
+
+        # Apply food growth and clip in the model
+        grown_food = mb.add(x=new_food, y=food_growth)
+        next_food = mb.clip(x=grown_food, alpha=np.float16(0.0), beta=np.float16(1.0))
+
+        next_world = mb.concat(values=[next_food, next_org], axis=1)
 
         return next_world
 
@@ -274,6 +280,7 @@ def build_evolution_engine():
     return ct.convert(
         world_step,
         compute_units=ct.ComputeUnit.CPU_AND_NE,
+        compute_precision=ct.precision.FLOAT16,
         minimum_deployment_target=ct.target.macOS13
     )
 
@@ -286,7 +293,7 @@ def get_model():
 
 # --- Runtime & Pygame ---
 def init_world():
-    world = np.zeros((1, CH_TOTAL, H_GRID, W_GRID), dtype=np.float32)
+    world = np.zeros((1, CH_TOTAL, H_GRID, W_GRID), dtype=np.float16)
     world[0, 0] = np.random.rand(H_GRID, W_GRID) * 0.3    # Wild food
     return world
 
@@ -523,14 +530,20 @@ def main():
 
         i = start_tick
         target_tick = start_tick + max_ticks if max_ticks else None
+
+        NOISE_FRAMES = 2000
+        mutation_bank = (np.random.randn(NOISE_FRAMES, 1, CH_WEIGHTS, H_GRID, W_GRID) * 0.1).astype(np.float16)
+        food_bank = (np.random.rand(NOISE_FRAMES, 1, 1, H_GRID, W_GRID) * 0.02).astype(np.float16)
+        n_ptr = 0
+
         try:
             while target_tick is None or i < target_tick:
-                mutation = (np.random.randn(1, CH_WEIGHTS, H_GRID, W_GRID) * 0.1).astype(np.float32)
-                out = model.predict({"world": world, "mutation": mutation})
-                world = list(out.values())[0]
+                mutation = mutation_bank[n_ptr]
+                food_growth = food_bank[n_ptr]
+                n_ptr = (n_ptr + 1) % NOISE_FRAMES
 
-                world[0, 0] += np.random.rand(H_GRID, W_GRID) * 0.02
-                world[0, 0] = np.clip(world[0,0], 0.0, 1.0)
+                out = model.predict({"world": world, "mutation": mutation, "food_growth": food_growth})
+                world = list(out.values())[0]
 
                 if i % interval == 0 or (target_tick and i == target_tick - 1):
                     orgs = world[0, 1]
@@ -616,6 +629,11 @@ def main():
 
     def sim_worker():
         nonlocal world, tick_count, running, paused, speed_mode
+        NOISE_FRAMES = 2000
+        mutation_bank = (np.random.randn(NOISE_FRAMES, 1, CH_WEIGHTS, H_GRID, W_GRID) * 0.1).astype(np.float16)
+        food_bank = (np.random.rand(NOISE_FRAMES, 1, 1, H_GRID, W_GRID) * 0.02).astype(np.float16)
+        n_ptr = 0
+
         while running:
             with sim_lock:
                 while len(sim_cmd_queue) > 0:
@@ -638,12 +656,11 @@ def main():
 
             sm = speed_mode
             if sm == 'MAX':
-                mutation = (np.random.randn(1, CH_WEIGHTS, H_GRID, W_GRID) * 0.1).astype(np.float32)
-                out = model.predict({"world": world, "mutation": mutation})
-                new_world = list(out.values())[0]
-                new_world[0, 0] += np.random.rand(H_GRID, W_GRID) * 0.02
-                new_world[0, 0] = np.clip(new_world[0,0], 0.0, 1.0)
-                world = new_world
+                mutation = mutation_bank[n_ptr]
+                food_growth = food_bank[n_ptr]
+                n_ptr = (n_ptr + 1) % NOISE_FRAMES
+                out = model.predict({"world": world, "mutation": mutation, "food_growth": food_growth})
+                world = list(out.values())[0]
                 tick_count += 1
             else:
                 t_start = time.time()
@@ -651,12 +668,11 @@ def main():
                     with sim_lock:
                         if paused or len(sim_cmd_queue) > 0:
                             break
-                    mutation = (np.random.randn(1, CH_WEIGHTS, H_GRID, W_GRID) * 0.1).astype(np.float32)
-                    out = model.predict({"world": world, "mutation": mutation})
-                    new_world = list(out.values())[0]
-                    new_world[0, 0] += np.random.rand(H_GRID, W_GRID) * 0.02
-                    new_world[0, 0] = np.clip(new_world[0,0], 0.0, 1.0)
-                    world = new_world
+                    mutation = mutation_bank[n_ptr]
+                    food_growth = food_bank[n_ptr]
+                    n_ptr = (n_ptr + 1) % NOISE_FRAMES
+                    out = model.predict({"world": world, "mutation": mutation, "food_growth": food_growth})
+                    world = list(out.values())[0]
                     tick_count += 1
 
                 # Approximate 60 loops per second to match UI expectation
